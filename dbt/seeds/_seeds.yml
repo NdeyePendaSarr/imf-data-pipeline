@@ -12,7 +12,16 @@ seeds:
   - name: mapping_canal_tresorerie
     description: Compte de trésorerie et journal résolus selon le canal (@TRESORERIE).
   - name: journaux
-    description: Journaux comptables et leur priorité (OUV et VIR priment sur le journal du canal).
+    description: >
+      Journaux comptables et leur priorité (D15). v0.4 : type_evenement = événement qui impose
+      le journal (OUV pour OUVERTURE, VIR pour APPRO_CAISSE), vide sinon.
+    config:
+      column_types:
+        code_journal: text
+        libelle: text
+        priorite: integer
+        regle: text
+        type_evenement: text
   - name: canaux_autorises
     description: Canaux autorisés par source (D16) ; un canal absent → motif CANAL_NON_AUTORISE.
     columns:

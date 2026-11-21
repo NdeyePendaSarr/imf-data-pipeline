@@ -5,6 +5,7 @@ Les contrôles sont recalculés à partir des tables, indépendamment de la simu
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 import pytest
 
@@ -416,3 +417,26 @@ def test_decaissements_jours_ouvres_et_mensuels(petite_generation: Generation) -
         saison = produits[c.code_produit].mois_decaissement
         if saison is not None:
             assert saison[0] <= c.date_decaissement.month <= saison[1]
+
+
+def test_par30_ecrit_dans_la_verite(petite_generation: Generation) -> None:
+    """data/_verite/par30.csv : PAR 30 au 31/12, encours à risque et encours total.
+
+    Recalculé indépendamment à partir des tables de la vérité ; la fraction des deux encours
+    est la valeur exacte, par30 son arrondi à 12 décimales. Oracle de la phase 6.
+    """
+    config, v = petite_generation.config, petite_generation.verite
+    lignes = lire_csv(config.sortie / "_verite" / "par30.csv")
+    assert len(lignes) == 1
+    ligne = lignes[0]
+    a_risque, total = calculer_par30(v.credits, v.echeancier, v.remboursements, config.fin)
+    assert ligne["date_arrete"] == config.fin.isoformat()
+    assert (int(ligne["encours_par30"]), int(ligne["encours_total"])) == (a_risque, total)
+    assert 0 < a_risque < total
+    assert Decimal(ligne["par30"]) == round(Decimal(a_risque) / Decimal(total), 12)
+    # Le manifeste liste le fichier (empreinte de génération) et reprend le même ratio.
+    assert "_verite/par30.csv" in petite_generation.manifeste["fichiers"]
+    assert (
+        abs(float(ligne["par30"]) - petite_generation.manifeste["indicateurs"]["par30_31_12"])
+        < 1e-6
+    )

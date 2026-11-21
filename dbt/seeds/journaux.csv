@@ -1,8 +1,8 @@
-code_journal,libelle,priorite,regle
-OUV,Ouverture,1,"type_evenement = OUVERTURE ; prime sur le journal du canal"
-VIR,Virements internes de fonds,1,"type_evenement = APPRO_CAISSE (banque vers caisse, D18) ; prime sur le journal du canal"
-CAI,Caisse,2,ligne @TRESORERIE résolue sur TRESO_CAISSE
-AGT,Agents,2,ligne @TRESORERIE résolue sur TRESO_LIAISON_AGENT
-MOB,Mobile money,2,ligne @TRESORERIE résolue sur TRESO_LIAISON_MM
-BQ,Banque,2,ligne @TRESORERIE résolue sur TRESO_BANQUE
-OD,Opérations diverses,3,"tous les autres cas : décaissement, frais, prélèvement"
+code_journal,libelle,priorite,regle,type_evenement
+OUV,Ouverture,1,"type_evenement = OUVERTURE ; prime sur le journal du canal",OUVERTURE
+VIR,Virements internes de fonds,1,"type_evenement = APPRO_CAISSE (banque vers caisse, D18) ; prime sur le journal du canal",APPRO_CAISSE
+CAI,Caisse,2,ligne @TRESORERIE résolue sur TRESO_CAISSE,
+AGT,Agents,2,ligne @TRESORERIE résolue sur TRESO_LIAISON_AGENT,
+MOB,Mobile money,2,ligne @TRESORERIE résolue sur TRESO_LIAISON_MM,
+BQ,Banque,2,ligne @TRESORERIE résolue sur TRESO_BANQUE,
+OD,Opérations diverses,3,"tous les autres cas : décaissement, frais, prélèvement",

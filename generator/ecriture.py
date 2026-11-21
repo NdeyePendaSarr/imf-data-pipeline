@@ -6,7 +6,7 @@ import json
 import shutil
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import astuple, fields
+from dataclasses import astuple, dataclass, fields
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -31,6 +31,20 @@ from generator.simulation import (
 
 MANIFESTE = "_manifest.json"
 DOSSIER_VERITE = "_verite"
+# Oracle du PAR 30 au 31/12, à retrouver par le pipeline en phase 6 (jamais chargé en base).
+FICHIER_PAR30 = "par30.csv"
+DECIMALES_PAR30 = 12
+
+
+@dataclass(frozen=True)
+class Par30:
+    """PAR 30 au 31/12 : encours à risque / encours total (valeur exacte = le quotient)."""
+
+    date_arrete: date
+    encours_par30: int
+    encours_total: int
+    par30: Decimal
+
 
 # Tables communes à la vérité et aux sorties brutes, dans l'ordre d'écriture, et leur classe.
 CLASSES: dict[str, type[Any]] = {
@@ -130,6 +144,17 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
 
     for table in TABLES:
         ecrire_csv(sortie / DOSSIER_VERITE / f"{table}.csv", CLASSES[table], getattr(verite, table))
+    ind = verite.indicateurs
+    # Les deux encours entiers donnent la valeur exacte ; par30 en est l'arrondi à 12 décimales.
+    par30 = Par30(
+        config.fin,
+        ind.encours_par30,
+        ind.encours_total,
+        round(Decimal(ind.encours_par30) / Decimal(ind.encours_total), DECIMALES_PAR30)
+        if ind.encours_total
+        else Decimal(0),
+    )
+    ecrire_csv(sortie / DOSSIER_VERITE / FICHIER_PAR30, Par30, [par30])
     for table in TABLES_CSV_BRUTES:
         ecrire_csv(sortie / f"{table}.csv", CLASSES[table], getattr(brut, table))
     ecrire_csv(sortie / "catalogue_anomalies.csv", LigneCatalogue, brut.catalogue)
@@ -151,7 +176,6 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
         for chemin in sorted(sortie.rglob("*"))
         if chemin.is_file() and chemin.name != MANIFESTE
     }
-    ind = verite.indicateurs
     manifeste: dict[str, Any] = {
         "parametres": {
             "exercice": config.exercice,

@@ -1,0 +1,78 @@
+version: 2
+
+models:
+  - name: fct_ecritures
+    description: >
+      Écritures comptables, une ligne d'écriture par ligne (débit ou crédit). Pièce = id_ecriture
+      (source_table:source_id:type_evenement, G4). Générées par jointure des événements avec
+      mapping_comptable (mvp), @TRESORERIE résolu par mapping_canal_tresorerie, journal selon D15.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_ecriture, num_ligne]
+    columns:
+      - name: id_ecriture
+        data_type: text
+        description: Pièce comptable, source_table:source_id:type_evenement.
+        data_tests: [not_null]
+      - name: num_ligne
+        data_type: integer
+        description: Numéro de la règle dans mapping_comptable (les lignes à montant 0 sont omises).
+        data_tests: [not_null]
+      - name: date_ecriture
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: code_journal
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_journal')
+                field: code_journal
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: code_compte
+        data_type: text
+        description: Compte du plan ; @TRESORERIE déjà résolu.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_compte_comptable')
+                field: code_compte
+      - name: debit
+        data_type: bigint
+        description: Montant au débit en XOF (0 si la ligne est au crédit).
+        data_tests: [not_null]
+      - name: credit
+        data_type: bigint
+        description: Montant au crédit en XOF (0 si la ligne est au débit).
+        data_tests: [not_null]
+      - name: type_evenement
+        data_type: text
+        data_tests: [not_null]
+      - name: source_table
+        data_type: text
+        data_tests: [not_null]
+      - name: source_id
+        data_type: text
+        data_tests: [not_null]
+      - name: version_mapping
+        data_type: text
+        description: Version des règles comptables (var version_mapping).
+        data_tests: [not_null]
