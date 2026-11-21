@@ -37,10 +37,10 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", "generator"]
+files = ["tests", "generator", "ingestion"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "generator/tests"]
+testpaths = ["tests", "generator/tests", "ingestion/tests"]
 pythonpath = ["."]
 addopts = "--strict-markers"
 markers = [
