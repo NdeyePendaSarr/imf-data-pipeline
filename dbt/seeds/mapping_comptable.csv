@@ -25,5 +25,7 @@ CHARGE_FOURNITURES,1,D,CHARGE_FOURNITURES,charges,montant,true,
 CHARGE_FOURNITURES,2,C,@TRESORERIE,charges,montant,true,
 CHARGE_COMMISSIONS_MM,1,D,CHARGE_COMMISSIONS_MM,charges,montant,true,
 CHARGE_COMMISSIONS_MM,2,C,@TRESORERIE,charges,montant,true,
+APPRO_CAISSE,1,D,TRESO_CAISSE,appro_caisse,montant,true,D18 : caisse de l'agence approvisionnée
+APPRO_CAISSE,2,C,TRESO_BANQUE,appro_caisse,montant,true,D18 : retrait d'espèces sur le compte bancaire de l'IMF
 DOTATION_DEPRECIATION,1,D,DOTATION_DEPRECIATION,provisions,montant,false,Bonus
 DOTATION_DEPRECIATION,2,C,DEPRECIATION_CREDITS,provisions,montant,false,Bonus
