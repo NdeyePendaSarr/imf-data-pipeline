@@ -6,9 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
+
 from generator.anomalies import Brut, injecter
 from generator.config import Config
 from generator.ecriture import ecrire_sorties
+from generator.imf_ops import ErreurConnexion, charger
 from generator.simulation import Verite, simuler
 
 
@@ -30,8 +33,8 @@ def generer(config: Config) -> Generation:
     return Generation(config, verite, brut, manifeste)
 
 
-def lire_arguments(arguments: list[str] | None = None) -> Config:
-    """Analyse la ligne de commande et renvoie la configuration."""
+def lire_arguments(arguments: list[str] | None = None) -> tuple[Config, bool]:
+    """Analyse la ligne de commande ; renvoie la configuration et l'option --sans-db."""
     defaut = Config()
     parser = argparse.ArgumentParser(
         prog="python -m generator",
@@ -45,6 +48,7 @@ def lire_arguments(arguments: list[str] | None = None) -> Config:
         "--taux-anomalies", type=float, default=defaut.taux_anomalies, help="taux par type"
     )
     parser.add_argument("--sortie", type=Path, default=defaut.sortie, help="dossier de sortie")
+    parser.add_argument("--sans-db", action="store_true", help="ne pas charger imf_ops")
     ns = parser.parse_args(arguments)
     config = Config(
         exercice=ns.exercice,
@@ -54,12 +58,13 @@ def lire_arguments(arguments: list[str] | None = None) -> Config:
         taux_anomalies=ns.taux_anomalies,
         sortie=ns.sortie,
     )
-    return config
+    return config, ns.sans_db
 
 
 def main(arguments: list[str] | None = None) -> int:
     """Exécute le générateur et affiche un résumé."""
-    config = lire_arguments(arguments)
+    load_dotenv()
+    config, sans_db = lire_arguments(arguments)
     try:
         generation = generer(config)
     except ValueError as erreur:
@@ -71,6 +76,14 @@ def main(arguments: list[str] | None = None) -> int:
     for table, nombre in sorted(lignes["brut"].items()):
         print(f"  {table:<22} {nombre:>8}")
     print(f"PAR 30 au 31/12 : {indicateurs['par30_31_12']:.2%}")
+    if sans_db:
+        return 0
+    try:
+        charges = charger(generation.brut)
+    except ErreurConnexion as erreur:
+        print(f"Erreur : {erreur}", file=sys.stderr)
+        return 1
+    print("imf_ops rechargée : " + ", ".join(f"{t}={n}" for t, n in charges.items()))
     return 0
 
 
