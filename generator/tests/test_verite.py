@@ -4,7 +4,7 @@ Les contrôles sont recalculés à partir des tables, indépendamment de la simu
 """
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 
 from generator import config as cfg
 from generator.__main__ import Generation
@@ -302,3 +302,43 @@ def test_pas_de_paiement_futur(petite_generation: Generation) -> None:
     debut = petite_generation.config.debut
     assert all(debut <= o.date_operation <= fin for o in v.operations)
     assert all(r.date_remboursement <= fin for r in v.remboursements)
+
+
+def test_regle_date_maj_filigrane(petite_generation: Generation) -> None:
+    """Règle 9.1 : date_maj métier déterministe, filigrane de l'ingestion incrémentale."""
+    config, v, b = petite_generation.config, petite_generation.verite, petite_generation.brut
+    tables = ("clients", "comptes", "produits_credit", "credits", "echeancier", "remboursements")
+
+    # Tous les date_maj (vérité et brut) sont dans l'exercice, à 20:00:00.
+    for source in (v, b):
+        for table in tables:
+            for ligne in getattr(source, table):
+                assert config.debut <= ligne.date_maj.date() <= config.fin, table
+                assert ligne.date_maj.time() == cfg.HEURE_DATE_MAJ, table
+
+    # Échéancier : date de décaissement du crédit (même pour les échéances après le 31/12).
+    credits = {c.id_credit: c for c in v.credits}
+    for e in v.echeancier:
+        assert e.date_maj == datetime.combine(
+            credits[e.id_credit].date_decaissement, cfg.HEURE_DATE_MAJ
+        )
+
+    # Crédit SOLDE : date du solde (dernier remboursement), distincte du décaissement.
+    dernier: dict[str, date] = {}
+    for r in v.remboursements:
+        dernier[r.id_credit] = max(r.date_remboursement, dernier.get(r.id_credit, date.min))
+    soldes = [c for c in v.credits if c.statut == "SOLDE"]
+    assert soldes, "la petite configuration doit contenir des crédits soldés"
+    for c in soldes:
+        assert c.date_maj == datetime.combine(dernier[c.id_credit], cfg.HEURE_DATE_MAJ)
+        assert c.date_maj.date() != c.date_decaissement
+
+    # Brut : seuls les remboursements ajoutés (date_maj du crédit visé) s'écartent de la règle.
+    ecarts = [
+        r
+        for r in b.remboursements
+        if r.date_maj != datetime.combine(r.date_remboursement, cfg.HEURE_DATE_MAJ)
+    ]
+    ajoutes = [c for c in b.catalogue if c.table == "remboursements"]
+    assert len(ecarts) == len(ajoutes) > 0
+    assert {r.id_remboursement for r in ecarts} == {c.id_ligne for c in ajoutes}
