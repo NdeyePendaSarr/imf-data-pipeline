@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: stg_agences
+    description: Agences typées ; motif_ecart TYPE_INVALIDE ou DOUBLON_EXACT.
+    columns:
+      - name: motif_ecart
+        description: Motif d'écart unique (NULL = ligne valide), vocabulaire du catalogue (S6).
+  - name: stg_ouverture
+    description: Ouvertures typées (vers_date, vers_bigint), canal standardisé ; id_ligne = agence|canal.
+    columns:
+      - name: motif_ecart
+        description: TYPE_INVALIDE > MONTANT_NEGATIF > CANAL_NON_AUTORISE, puis DOUBLON_EXACT.
+  - name: stg_operations
+    description: >
+      Opérations typées et standardisées, avec le rang de doublon par identifiant (ordre _source,
+      _num_ligne) et le motif d'écart.
+    columns:
+      - name: rang_doublon
+        description: 1 pour la première occurrence d'un identifiant, > 1 pour ses copies.
+      - name: motif_ecart
+        description: >
+          TYPE_INVALIDE > ORPHELIN_COMPTE > MONTANT_NEGATIF > CANAL_NON_AUTORISE ; une copie de
+          rang > 1 d'une ligne valide → DOUBLON_EXACT.
+  - name: stg_charges
+    description: Charges typées et standardisées, rang de doublon et motif d'écart.
+    columns:
+      - name: motif_ecart
+        description: TYPE_INVALIDE > MONTANT_NEGATIF > CANAL_NON_AUTORISE, puis DOUBLON_EXACT.
+  - name: stg_appro_caisse
+    description: Approvisionnements typés, rang de doublon et motif d'écart.
+    columns:
+      - name: motif_ecart
+        description: TYPE_INVALIDE > MONTANT_NEGATIF, puis DOUBLON_EXACT.
+  - name: stg_catalogue_anomalies
+    description: Catalogue des anomalies typé ("table" renommée table_source) ; sert aux tests de catalogue.
+  - name: stg_produits_credit
+    description: Produits de crédit, dernière version par code (date_maj desc, _charge_le desc).
+  - name: stg_clients
+    description: Clients, dernière version par identifiant ; aucun motif (les NULL sont acceptés).
+  - name: stg_comptes
+    description: Comptes, dernière version par identifiant.
+  - name: stg_credits
+    description: Crédits, dernière version par identifiant ; statut = état au 31/12 (I10).
+  - name: stg_echeancier
+    description: Échéancier, dernière version par (crédit, numéro d'échéance).
+  - name: stg_remboursements
+    description: Remboursements, dernière version par identifiant, canal standardisé et motif d'écart.
+    columns:
+      - name: motif_ecart
+        description: >
+          MONTANT_NEGATIF > CANAL_NON_AUTORISE > DATE_INCOHERENTE (avant le décaissement)
+          > MONTANT_PAYE_INCOHERENT (montant_paye ≠ somme des parts).

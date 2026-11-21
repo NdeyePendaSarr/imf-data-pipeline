@@ -1,0 +1,664 @@
+version: 2
+
+models:
+  - name: slv_agences
+    description: Agences valides (instantané). Lignes de stg_agences sans motif_ecart (les autres sont dans slv_lignes_ecartees).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_agence
+        data_type: text
+        description: "Identifiant de l'agence (AG…)."
+        data_tests:
+          - unique
+          - not_null
+      - name: nom
+        data_type: text
+      - name: ville
+        data_type: text
+      - name: region
+        data_type: text
+      - name: type_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - SIEGE
+                  - REGIONALE
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_ouverture
+    description: "Ouvertures valides du 01/01 : capital (VIREMENT) et fonds de caisse (GUICHET). Lignes de stg_ouverture sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - id_agence
+              - canal
+    columns:
+      - name: id_agence
+        data_type: text
+        description: "Identifiant de l'agence (AG…)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_agences')"
+                field: id_agence
+      - name: date_ouverture
+        data_type: date
+        data_tests:
+          - not_null
+      - name: canal
+        data_type: text
+        description: "Canal standardisé (upper(trim)), autorisé par le seed canaux_autorises."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - VIREMENT
+                  - GUICHET
+          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
+          #     arguments:
+          #       source: ouverture
+      - name: montant
+        data_type: bigint
+        description: "Montant en XOF (entier, ≥ 0)."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_operations
+    description: "Opérations valides, dédoublonnées, canal standardisé (FRAIS_TENUE compris, S15). Lignes de stg_operations sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_operation
+        data_type: text
+        description: "Identifiant de l'opération (OPE…), unique après dédoublonnage."
+        data_tests:
+          - unique
+          - not_null
+      - name: id_compte
+        data_type: text
+        description: Identifiant du compte client (CPT…).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_comptes')"
+                field: id_compte
+      - name: id_agence
+        data_type: text
+        description: "Identifiant de l'agence (AG…)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_agences')"
+                field: id_agence
+      - name: date_operation
+        data_type: date
+        data_tests:
+          - not_null
+      - name: type_operation
+        data_type: text
+        description: "DEPOT, RETRAIT ou FRAIS_TENUE."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - DEPOT
+                  - RETRAIT
+                  - FRAIS_TENUE
+      - name: canal
+        data_type: text
+        description: "Canal standardisé (upper(trim)), autorisé par le seed canaux_autorises."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - GUICHET
+                  - AGENT
+                  - MOBILE
+          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
+          #     arguments:
+          #       source: operations
+      - name: montant
+        data_type: bigint
+        description: "Montant en XOF (entier, ≥ 0)."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_charges
+    description: "Charges valides, dédoublonnées. Lignes de stg_charges sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_charge
+        data_type: text
+        description: Identifiant de la charge (CHG…).
+        data_tests:
+          - unique
+          - not_null
+      - name: id_agence
+        data_type: text
+        description: "Identifiant de l'agence (AG…)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_agences')"
+                field: id_agence
+      - name: date_charge
+        data_type: date
+        data_tests:
+          - not_null
+      - name: categorie
+        data_type: text
+        description: "Catégorie de charge (LOYERS, PERSONNEL, TELECOM_SI, COMMISSIONS_MM, FOURNITURES)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - LOYERS
+                  - PERSONNEL
+                  - TELECOM_SI
+                  - COMMISSIONS_MM
+                  - FOURNITURES
+      - name: canal
+        data_type: text
+        description: "Canal standardisé (upper(trim)), autorisé par le seed canaux_autorises."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - VIREMENT
+                  - GUICHET
+          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
+          #     arguments:
+          #       source: charges
+      - name: montant
+        data_type: bigint
+        description: "Montant en XOF (entier, ≥ 0)."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_appro_caisse
+    description: Approvisionnements de caisse valides (D18). Lignes de stg_appro_caisse sans motif_ecart (les autres sont dans slv_lignes_ecartees).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_appro
+        data_type: text
+        description: "Identifiant de l'approvisionnement (APP…)."
+        data_tests:
+          - unique
+          - not_null
+      - name: id_agence
+        data_type: text
+        description: "Identifiant de l'agence (AG…)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_agences')"
+                field: id_agence
+      - name: date_appro
+        data_type: date
+        data_tests:
+          - not_null
+      - name: montant
+        data_type: bigint
+        description: "Montant en XOF (entier, ≥ 0)."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_produits_credit
+    description: "Produits de crédit, dernière version. Lignes de stg_produits_credit sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: code_produit
+        data_type: text
+        description: Code du produit de crédit.
+        data_tests:
+          - unique
+          - not_null
+      - name: libelle
+        data_type: text
+      - name: taux_annuel
+        data_type: numeric(6,4)
+      - name: taux_frais_dossier
+        data_type: numeric(6,4)
+      - name: duree_min_mois
+        data_type: smallint
+      - name: duree_max_mois
+        data_type: smallint
+      - name: date_maj
+        data_type: timestamp
+        description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_clients
+    description: "Clients, dernière version ; NULL acceptés sur date_naissance et secteur_activite. Lignes de stg_clients sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_client
+        data_type: text
+        description: Identifiant du client (CLI…).
+        data_tests:
+          - unique
+          - not_null
+      - name: id_agence
+        data_type: text
+        description: "Identifiant de l'agence (AG…)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_agences')"
+                field: id_agence
+      - name: prenom
+        data_type: text
+      - name: nom
+        data_type: text
+      - name: sexe
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - F
+                  - M
+      - name: date_naissance
+        data_type: date
+        description: Peut être NULL (anomalie NULL_NON_CRITIQUE acceptée).
+      - name: secteur_activite
+        data_type: text
+        description: Peut être NULL (anomalie NULL_NON_CRITIQUE acceptée).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - COMMERCE
+                  - AGRICULTURE
+                  - ELEVAGE
+                  - PECHE
+                  - ARTISANAT
+                  - TRANSPORT
+                  - SERVICES
+      - name: date_adhesion
+        data_type: date
+        data_tests:
+          - not_null
+      - name: date_maj
+        data_type: timestamp
+        description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_comptes
+    description: "Comptes, dernière version. Lignes de stg_comptes sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_compte
+        data_type: text
+        description: Identifiant du compte client (CPT…).
+        data_tests:
+          - unique
+          - not_null
+      - name: id_client
+        data_type: text
+        description: Identifiant du client (CLI…).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_clients')"
+                field: id_client
+      - name: type_compte
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - EPARGNE
+                  - COURANT
+      - name: date_ouverture
+        data_type: date
+      - name: statut
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - ACTIF
+      - name: date_maj
+        data_type: timestamp
+        description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_credits
+    description: "Crédits, dernière version. statut renommé statut_au_31_12 (S9). Lignes de stg_credits sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_credit
+        data_type: text
+        description: Identifiant du crédit (CRD…).
+        data_tests:
+          - unique
+          - not_null
+      - name: id_client
+        data_type: text
+        description: Identifiant du client (CLI…).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_clients')"
+                field: id_client
+      - name: id_compte_epargne
+        data_type: text
+        description: "Compte d'épargne sur lequel le crédit est versé."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_comptes')"
+                field: id_compte
+      - name: code_produit
+        data_type: text
+        description: Code du produit de crédit.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_produits_credit')"
+                field: code_produit
+      - name: date_decaissement
+        data_type: date
+        data_tests:
+          - not_null
+      - name: montant_accorde
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: frais_dossier
+        data_type: bigint
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: duree_mois
+        data_type: smallint
+      - name: taux_annuel
+        data_type: numeric(6,4)
+      - name: statut_au_31_12
+        data_type: text
+        description: "Statut du crédit au 31/12 de l'exercice (EN_COURS ou SOLDE). Connu dès le décaissement (I10) : ne jamais l'utiliser pour une analyse à date."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - EN_COURS
+                  - SOLDE
+      - name: date_maj
+        data_type: timestamp
+        description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_echeancier
+    description: "Échéancier théorique, dernière version. Lignes de stg_echeancier sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - id_credit
+              - num_echeance
+    columns:
+      - name: id_credit
+        data_type: text
+        description: Identifiant du crédit (CRD…).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_credits')"
+                field: id_credit
+      - name: num_echeance
+        data_type: smallint
+        data_tests:
+          - not_null
+      - name: date_echeance
+        data_type: date
+        data_tests:
+          - not_null
+      - name: capital
+        data_type: bigint
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: interets
+        data_type: bigint
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: montant
+        data_type: bigint
+        description: "Montant en XOF (entier, ≥ 0)."
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: date_maj
+        data_type: timestamp
+        description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_remboursements
+    description: "Remboursements valides, dernière version. Lignes de stg_remboursements sans motif_ecart (les autres sont dans slv_lignes_ecartees)."
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_remboursement
+        data_type: text
+        description: Identifiant du remboursement (RMB…).
+        data_tests:
+          - unique
+          - not_null
+      - name: id_credit
+        data_type: text
+        description: Identifiant du crédit (CRD…).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: "ref('slv_credits')"
+                field: id_credit
+      - name: date_remboursement
+        data_type: date
+        data_tests:
+          - not_null
+      - name: montant_paye
+        data_type: bigint
+        description: "Montant payé = part_capital + part_interets + penalites."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: part_capital
+        data_type: bigint
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: part_interets
+        data_type: bigint
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: penalites
+        data_type: bigint
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: canal
+        data_type: text
+        description: "Canal standardisé (upper(trim)), autorisé par le seed canaux_autorises."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - GUICHET
+                  - AGENT
+                  - MOBILE
+                  - PRELEVEMENT
+          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
+          #     arguments:
+          #       source: remboursements
+      - name: date_maj
+        data_type: timestamp
+        description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."
+      - name: _id_run
+        data_type: text
+        description: "Run d'ingestion bronze qui a chargé la ligne (AAAA-MM-JJ#n)."
+      - name: _source
+        data_type: text
+        description: "Fichier bronze d'origine (chemin relatif)."
+  - name: slv_lignes_ecartees
+    description: >
+      Toutes les lignes écartées du silver (S3) : une ligne par ligne de staging ayant un
+      motif_ecart, avec le traitement (REJETER ou DEDOUBLONNER) et la traçabilité bronze.
+      Comparée au catalogue des anomalies par les tests dbt/tests/catalogue_*.sql.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: table_source
+        data_type: text
+        description: Table d'origine (nom du catalogue des anomalies, ex. operations).
+        data_tests:
+          - not_null
+      - name: id_ligne
+        data_type: text
+        description: Identifiant de la ligne écartée (clé (agence|canal) pour ouverture).
+        data_tests:
+          - not_null
+      - name: motif_ecart
+        data_type: text
+        description: Motif unique, même vocabulaire que les natures du catalogue (S6).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [TYPE_INVALIDE, ORPHELIN_COMPTE, MONTANT_NEGATIF, CANAL_NON_AUTORISE, DATE_INCOHERENTE, MONTANT_PAYE_INCOHERENT, DOUBLON_EXACT]
+      - name: traitement
+        data_type: text
+        description: DEDOUBLONNER pour une copie de doublon exact, REJETER sinon.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [REJETER, DEDOUBLONNER]
+      - name: _id_run
+        data_type: text
+        description: Run d'ingestion bronze qui a chargé la ligne.
+      - name: _source
+        data_type: text
+        description: Fichier bronze d'origine.
+      - name: _num_ligne
+        data_type: integer
+        description: Ligne physique dans le fichier bronze (en-tête = 1).
