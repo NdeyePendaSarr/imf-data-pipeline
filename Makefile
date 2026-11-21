@@ -3,11 +3,11 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
-	lint format typecheck test test-all check
+	ingest ingest-range ingest-all reset-bronze lint format typecheck test test-all check
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 install: ## Installe l'environnement Python (uv sync)
 	uv sync
@@ -37,6 +37,22 @@ generate: ## Génère data/ et recharge imf_ops (configuration par défaut)
 
 generate-small: ## Génère un petit jeu (100 clients, 150 crédits) et recharge imf_ops
 	uv run python -m generator --clients 100 --credits 150
+
+ingest: ## Ingère un jour dans bronze : make ingest DATE=AAAA-MM-JJ
+	@test -n "$(DATE)" || { echo "Usage : make ingest DATE=AAAA-MM-JJ"; exit 2; }
+	uv run python -m ingestion --date $(DATE)
+
+ingest-range: ## Ingère une période jour par jour : make ingest-range DU=… AU=…
+	@test -n "$(DU)" -a -n "$(AU)" || { echo "Usage : make ingest-range DU=AAAA-MM-JJ AU=AAAA-MM-JJ"; exit 2; }
+	uv run python -m ingestion --du $(DU) --au $(AU)
+
+ingest-all: ## Ingère tous les jours de l'exercice (rattrapage complet)
+	uv run python -m ingestion --exercice
+
+reset-bronze: ## SUPPRIME le schéma bronze de imf_dwh puis le recrée vide
+	@echo "⚠️  ATTENTION : reset-bronze supprime toutes les données du schéma bronze (imf_dwh)."
+	docker compose exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d imf_dwh -v ON_ERROR_STOP=1 \
+		-c "DROP SCHEMA IF EXISTS bronze CASCADE" -c "CREATE SCHEMA bronze"'
 
 lint: ## Vérifie le style (ruff check + ruff format --check)
 	uv run ruff check .
