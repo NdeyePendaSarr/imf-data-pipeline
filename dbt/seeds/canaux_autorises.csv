@@ -1,0 +1,12 @@
+source,canal,commentaire
+operations,GUICHET,Dépôt / retrait / frais de tenue au guichet
+operations,AGENT,Collecte par un agent
+operations,MOBILE,Mobile money
+remboursements,GUICHET,
+remboursements,AGENT,
+remboursements,MOBILE,
+remboursements,PRELEVEMENT,Débit du compte d'épargne du client
+charges,VIREMENT,Paiement par la banque
+charges,GUICHET,Paiement en espèces depuis la caisse d'une agence
+ouverture,VIREMENT,Apport en capital sur le compte bancaire
+ouverture,GUICHET,Fonds de caisse d'une agence

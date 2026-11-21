@@ -1,0 +1,22 @@
+code_compte,libelle,nature,sens_normal,etat,rubrique,compte_sfd,compte_syscohada_equiv,statut_correspondance,mvp,commentaire
+CAPITAL,Capital ou dotation initiale,PASSIF,C,BILAN,P1_CAPITAUX_PROPRES,,101,EQUIVALENT,true,IMF fictive en SA ; parts sociales si forme mutualiste
+TRESO_BANQUE,Banque (compte chez un correspondant),ACTIF,D,BILAN,A2_TRESORERIE,,521,EQUIVALENT,true,
+TRESO_CAISSE,Caisse des agences,ACTIF,D,BILAN,A2_TRESORERIE,,571,EQUIVALENT,true,Un seul compte ; l'agence est un axe analytique de fct_ecritures
+TRESO_LIAISON_MM,Liaison opérateur mobile money,ACTIF,D,BILAN,A2_TRESORERIE,,55,APPROXIMATIF,true,Sous-compte de monnaie électronique à choisir dans le plan relevé
+TRESO_LIAISON_AGENT,Liaison agents de collecte,ACTIF,D,BILAN,A2_TRESORERIE,,47,APPROXIMATIF,true,Ne pas utiliser 585 ou 588 : non cités par le tableau Postes/Comptes
+CREDITS_SAINS,Crédits à la clientèle (encours sain),ACTIF,D,BILAN,A1_CREDITS_CLIENTELE,,27,APPROXIMATIF,true,Le SYSCOHADA général n'a pas de compte d'activité de crédit ; sous-compte 27x à choisir
+DEPOTS_EPARGNE,Dépôts de la clientèle (épargne non rémunérée),PASSIF,C,BILAN,P2_DEPOTS_CLIENTELE,,165,APPROXIMATIF,true,Alternative 47x ; pas d'équivalent exact
+PRODUIT_INTERETS,Intérêts sur crédits (encaissés),PRODUIT,C,CR,R1_PRODUITS_FINANCIERS,,771,EQUIVALENT,true,Reconnus à l'encaissement : écart assumé au référentiel SFD (engagement)
+PRODUIT_PENALITES,Pénalités de retard,PRODUIT,C,CR,R1_PRODUITS_FINANCIERS,,77,APPROXIMATIF,true,Sous-compte à choisir
+PRODUIT_FRAIS_DOSSIER,Frais de dossier de crédit,PRODUIT,C,CR,R2_COMMISSIONS,,706,APPROXIMATIF,true,Constatés en une fois au décaissement (pas d'étalement)
+PRODUIT_FRAIS_TENUE,Frais de tenue de compte,PRODUIT,C,CR,R2_COMMISSIONS,,706,APPROXIMATIF,true,
+CHARGE_PERSONNEL,Salaires du personnel,CHARGE,D,CR,R3_CHARGES_PERSONNEL,,661,EQUIVALENT,true,
+CHARGE_LOYERS,Loyers des agences,CHARGE,D,CR,R4_CHARGES_GENERALES,,622,EQUIVALENT,true,
+CHARGE_TELECOM_SI,Télécommunications et logiciel,CHARGE,D,CR,R4_CHARGES_GENERALES,,628,APPROXIMATIF,true,
+CHARGE_FOURNITURES,Fournitures de bureau,CHARGE,D,CR,R4_CHARGES_GENERALES,,605,APPROXIMATIF,true,
+CHARGE_COMMISSIONS_MM,Commissions versées (opérateur mobile et agents),CHARGE,D,CR,R4_CHARGES_GENERALES,,632,APPROXIMATIF,true,
+CREDITS_SOUFFRANCE,Crédits en souffrance,ACTIF,D,BILAN,A1_CREDITS_CLIENTELE,,,A_VERIFIER,false,Bonus provisions
+DEPRECIATION_CREDITS,Dépréciation des crédits en souffrance,ACTIF,C,BILAN,A1_CREDITS_CLIENTELE,,,A_VERIFIER,false,Bonus provisions ; compte soustractif
+DOTATION_DEPRECIATION,Dotations aux dépréciations sur crédits,CHARGE,D,CR,R5_COUT_DU_RISQUE,,,A_VERIFIER,false,Bonus provisions
+REPRISE_DEPRECIATION,Reprises de dépréciations sur crédits,PRODUIT,C,CR,R5_COUT_DU_RISQUE,,,A_VERIFIER,false,Bonus provisions
+CHARGE_INTERETS_EPARGNE,Intérêts versés sur l'épargne,CHARGE,D,CR,R6_CHARGES_FINANCIERES,,,A_VERIFIER,false,Bonus épargne rémunérée ; rubrique de charges (v0.2)

@@ -1,0 +1,6 @@
+canal,code_compte,code_journal,commentaire
+GUICHET,TRESO_CAISSE,CAI,Espèces au guichet de l'agence
+AGENT,TRESO_LIAISON_AGENT,AGT,Collecte par un agent ; reversement hors MVP
+MOBILE,TRESO_LIAISON_MM,MOB,Mobile money ; compensation avec l'opérateur hors MVP
+VIREMENT,TRESO_BANQUE,BQ,Mouvement sur le compte bancaire
+PRELEVEMENT,DEPOTS_EPARGNE,OD,Débit du compte d'épargne du client (remboursements uniquement : voir canaux_autorises.csv)

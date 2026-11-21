@@ -1,0 +1,29 @@
+type_evenement,num_ligne,sens,code_compte,source,champ_montant,mvp,commentaire
+OUVERTURE,1,D,@TRESORERIE,ouverture,montant,true,Banque (canal VIREMENT) ou fonds de caisse d'agence (canal GUICHET)
+OUVERTURE,2,C,CAPITAL,ouverture,montant,true,
+DEPOT,1,D,@TRESORERIE,operations,montant,true,Caisse / liaison agent / liaison mobile selon le canal
+DEPOT,2,C,DEPOTS_EPARGNE,operations,montant,true,
+RETRAIT,1,D,DEPOTS_EPARGNE,operations,montant,true,
+RETRAIT,2,C,@TRESORERIE,operations,montant,true,
+FRAIS_TENUE,1,D,DEPOTS_EPARGNE,operations,montant,true,Prélevés sur le compte du client
+FRAIS_TENUE,2,C,PRODUIT_FRAIS_TENUE,operations,montant,true,
+DECAISSEMENT,1,D,CREDITS_SAINS,credits,montant_accorde,true,Virement sur le compte d'épargne du client
+DECAISSEMENT,2,C,DEPOTS_EPARGNE,credits,montant_accorde,true,
+FRAIS_DOSSIER,1,D,DEPOTS_EPARGNE,credits,frais_dossier,true,Prélevés sur le compte du client au décaissement
+FRAIS_DOSSIER,2,C,PRODUIT_FRAIS_DOSSIER,credits,frais_dossier,true,
+REMBOURSEMENT,1,D,@TRESORERIE,remboursements,montant_paye,true,Canal PRELEVEMENT : débit du compte d'épargne
+REMBOURSEMENT,2,C,CREDITS_SAINS,remboursements,part_capital,true,
+REMBOURSEMENT,3,C,PRODUIT_INTERETS,remboursements,part_interets,true,
+REMBOURSEMENT,4,C,PRODUIT_PENALITES,remboursements,penalites,true,Ligne omise si penalites = 0
+CHARGE_PERSONNEL,1,D,CHARGE_PERSONNEL,charges,montant,true,
+CHARGE_PERSONNEL,2,C,@TRESORERIE,charges,montant,true,
+CHARGE_LOYERS,1,D,CHARGE_LOYERS,charges,montant,true,
+CHARGE_LOYERS,2,C,@TRESORERIE,charges,montant,true,
+CHARGE_TELECOM_SI,1,D,CHARGE_TELECOM_SI,charges,montant,true,
+CHARGE_TELECOM_SI,2,C,@TRESORERIE,charges,montant,true,
+CHARGE_FOURNITURES,1,D,CHARGE_FOURNITURES,charges,montant,true,
+CHARGE_FOURNITURES,2,C,@TRESORERIE,charges,montant,true,
+CHARGE_COMMISSIONS_MM,1,D,CHARGE_COMMISSIONS_MM,charges,montant,true,
+CHARGE_COMMISSIONS_MM,2,C,@TRESORERIE,charges,montant,true,
+DOTATION_DEPRECIATION,1,D,DOTATION_DEPRECIATION,provisions,montant,false,Bonus
+DOTATION_DEPRECIATION,2,C,DEPRECIATION_CREDITS,provisions,montant,false,Bonus

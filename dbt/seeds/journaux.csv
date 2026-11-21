@@ -1,0 +1,7 @@
+code_journal,libelle,priorite,regle
+OUV,Ouverture,1,"type_evenement = OUVERTURE ; prime sur le journal du canal"
+CAI,Caisse,2,ligne @TRESORERIE résolue sur TRESO_CAISSE
+AGT,Agents,2,ligne @TRESORERIE résolue sur TRESO_LIAISON_AGENT
+MOB,Mobile money,2,ligne @TRESORERIE résolue sur TRESO_LIAISON_MM
+BQ,Banque,2,ligne @TRESORERIE résolue sur TRESO_BANQUE
+OD,Opérations diverses,3,"tous les autres cas : décaissement, frais, prélèvement"
