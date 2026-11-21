@@ -1,0 +1,44 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Couche bronze de imf_dwh, alimentée par l'ingestion incrémentale (python -m ingestion).
+      Rien n'y est transformé ni dédoublonné : CSV en TEXT, imf_ops avec ses types et une ligne
+      par version (clé, date_maj). Colonnes techniques communes : _id_run (AAAA-MM-JJ#n),
+      _source (chemin relatif du fichier), _num_ligne (ligne physique, en-tête = 1), _sha256,
+      _charge_le (seule colonne non déterministe).
+    schema: bronze
+    tables:
+      - name: csv_agences
+        description: Instantané des agences (siège et agences régionales), colonnes en TEXT.
+      - name: csv_ouverture
+        description: Instantané des ouvertures du 01/01 (capital en banque, fonds de caisse), clé (agence, canal).
+      - name: csv_operations
+        description: Opérations des comptes (DEPOT, RETRAIT, FRAIS_TENUE), une partition par jour, doublons exacts conservés.
+      - name: csv_charges
+        description: Charges de fonctionnement, une partition par jour.
+      - name: csv_appro_caisse
+        description: Approvisionnements des caisses depuis la banque (D18), une partition par jour.
+      - name: meta_catalogue_anomalies
+        description: >
+          Catalogue des anomalies injectées par le générateur (métadonnée de test, pas une source
+          métier) : nature, table, id_ligne, nombre de copies, traitement attendu.
+      - name: ops_produits_credit
+        description: Catalogue des produits de crédit (imf_ops), une ligne par version.
+      - name: ops_clients
+        description: Clients (imf_ops), une ligne par version ; date_naissance et secteur_activite peuvent être NULL.
+      - name: ops_comptes
+        description: Comptes d'épargne et courants (imf_ops), une ligne par version.
+      - name: ops_credits
+        description: >
+          Crédits (imf_ops), une ligne par version. Le statut reflète l'état au 31/12 dès le
+          décaissement (I10) : ne jamais l'utiliser pour une analyse à date.
+      - name: ops_echeancier
+        description: Échéancier théorique des crédits (imf_ops), échéances postérieures au 31/12 comprises.
+      - name: ops_remboursements
+        description: Remboursements (imf_ops), anomalies DATE_INCOHERENTE et MONTANT_PAYE_INCOHERENT comprises.
+      - name: _filigranes
+        description: Pilotage de l'ingestion — plus grand date_maj extrait par table de imf_ops.
+      - name: _ingestions
+        description: Journal de l'ingestion — une ligne par objet traité et par run (CHARGE, IGNORE, VIDE).

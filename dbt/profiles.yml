@@ -1,0 +1,15 @@
+# Profil dbt versionné : aucun secret, uniquement des variables d'environnement (.env).
+# Lancer dbt via le Makefile (uv run --env-file .env …) pour charger le .env.
+imf_dwh:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5433') | as_number }}"
+      user: "{{ env_var('POSTGRES_USER') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('POSTGRES_DB_DWH', 'imf_dwh') }}"
+      # Schéma par défaut ; generate_schema_name impose les schémas exacts silver / gold.
+      schema: silver
+      threads: 4

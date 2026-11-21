@@ -18,6 +18,7 @@ data/
 dbt/target/
 dbt/logs/
 dbt/dbt_packages/
+dbt/.user.yml
 
 # Caches des outils
 .pytest_cache/

@@ -159,3 +159,23 @@ def test_taux_d_anomalies_environ_un_pour_cent(petite_generation: Generation) ->
     attendu = max(1, round(0.01 * len(v.operations)))
     assert par_nature["MONTANT_NEGATIF"] == attendu
     assert par_nature["NULL_NON_CRITIQUE"] == max(1, round(0.01 * len(v.clients)))
+
+
+def test_chaque_anomalie_n_enfreint_que_sa_regle(petite_generation: Generation) -> None:
+    """Les remboursements ajoutés ne violent que la règle de leur nature (un seul motif)."""
+    b = petite_generation.brut
+    natures = {c.id_ligne: c.nature for c in b.catalogue if c.table == "remboursements"}
+    credits = {c.id_credit: c for c in b.credits}
+    canaux = {"GUICHET", "AGENT", "MOBILE", "PRELEVEMENT"}
+    for r in b.remboursements:
+        if r.id_remboursement not in natures:
+            continue
+        nature = natures[r.id_remboursement]
+        # Jamais de montant négatif ni de canal interdit sur ces lignes.
+        assert min(r.montant_paye, r.part_capital, r.part_interets, r.penalites) >= 0
+        assert r.canal in canaux
+        avant = r.date_remboursement < credits[r.id_credit].date_decaissement
+        incoherent = r.montant_paye != r.part_capital + r.part_interets + r.penalites
+        assert (avant, incoherent) == (
+            (True, False) if nature == "DATE_INCOHERENTE" else (False, True)
+        ), (nature, r)

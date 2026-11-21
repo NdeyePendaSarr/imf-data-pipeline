@@ -1,0 +1,22 @@
+version: 2
+
+seeds:
+  - name: plan_comptes
+    description: Plan de comptes simplifié à codes internes (cadrage phase 0), correspondances SYSCOHADA indicatives.
+    config:
+      column_types:
+        compte_sfd: text
+        compte_syscohada_equiv: text
+  - name: mapping_comptable
+    description: Règles d'écriture par type d'événement (sens, compte, champ montant), dont APPRO_CAISSE (D18).
+  - name: mapping_canal_tresorerie
+    description: Compte de trésorerie et journal résolus selon le canal (@TRESORERIE).
+  - name: journaux
+    description: Journaux comptables et leur priorité (OUV et VIR priment sur le journal du canal).
+  - name: canaux_autorises
+    description: Canaux autorisés par source (D16) ; un canal absent → motif CANAL_NON_AUTORISE.
+    columns:
+      - name: source
+        description: Source de l'événement (operations, remboursements, charges, ouverture).
+      - name: canal
+        description: Canal autorisé pour cette source.

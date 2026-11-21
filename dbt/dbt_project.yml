@@ -1,0 +1,36 @@
+# Projet dbt de l'entrepôt imf_dwh : bronze (sources) → silver (phase 4) → gold (phase 5).
+name: imf_dwh
+version: "1.0.0"
+profile: imf_dwh
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+flags:
+  # Aucune statistique d'usage envoyée à dbt Labs.
+  send_anonymous_usage_stats: false
+
+models:
+  imf_dwh:
+    silver:
+      # Silver : tables reconstruites à chaque build, aucun incrémental (S14).
+      +schema: silver
+      +materialized: table
+      staging:
+        # Staging : vues de typage, standardisation et motif d'écart (S3).
+        +materialized: view
+      intermediate:
+        +materialized: table
+
+seeds:
+  imf_dwh:
+    # Référentiels du cadrage (plan de comptes, mapping, canaux) dans le schéma silver (S2).
+    +schema: silver
+    canaux_autorises:
+      +column_types:
+        source: text
+        canal: text
+        commentaire: text

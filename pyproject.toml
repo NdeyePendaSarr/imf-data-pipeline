@@ -11,6 +11,10 @@ dependencies = [
 ]
 
 [dependency-groups]
+dbt = [
+    "dbt-core>=1.8",
+    "dbt-postgres>=1.8",
+]
 dev = [
     "mypy>=2.4.1",
     "pytest>=9.2.0",
@@ -21,6 +25,8 @@ dev = [
 [tool.uv]
 # Projet applicatif : pas de paquet Python à construire.
 package = false
+# uv sync / uv run installent aussi dbt (groupe séparé, cf. décision S1).
+default-groups = ["dev", "dbt"]
 
 [tool.ruff]
 line-length = 100

@@ -180,7 +180,13 @@ def _anomalies_remboursements(
         credit = rng.choice(verite.credits)
         delai = rng.randint(1, max(1, (config.fin - credit.date_decaissement).days))
         ecart = rng.randint(*cfg.ECART_MONTANT_INCOHERENT) * cfg.PAS_MONTANT_OPERATION
-        r = ligne(credit, delai, ecart * rng.choice((-1, 1)))
+        signe = rng.choice((-1, 1))
+        # Une anomalie n'enfreint que sa propre règle : un écart négatif ne doit jamais rendre
+        # montant_paye ≤ 0 (ce serait aussi un MONTANT_NEGATIF, prioritaire en silver). Même
+        # nombre de tirages qu'avant : le reste de la génération est inchangé.
+        if premiere[credit.id_credit].montant - ecart <= 0:
+            signe = 1
+        r = ligne(credit, delai, ecart * signe)
         lignes.append(r)
         catalogue.append(
             LigneCatalogue(

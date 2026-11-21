@@ -3,7 +3,8 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
-	ingest ingest-range ingest-all reset-bronze lint format typecheck test test-all check
+	ingest ingest-range ingest-all reset-bronze \
+	dbt-deps dbt-build test-verite lint format typecheck test test-all check
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -54,6 +55,20 @@ reset-bronze: ## SUPPRIME le schéma bronze de imf_dwh puis le recrée vide
 	docker compose exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d imf_dwh -v ON_ERROR_STOP=1 \
 		-c "DROP SCHEMA IF EXISTS bronze CASCADE" -c "CREATE SCHEMA bronze"'
 
+# dbt lit le .env via uv (profiles.yml : uniquement env_var()).
+DBT = uv run --env-file .env dbt
+DBT_OPTIONS = --project-dir dbt --profiles-dir dbt
+
+dbt-deps: ## Installe les packages dbt (dbt_utils)
+	$(DBT) deps $(DBT_OPTIONS)
+
+dbt-build: ## Seeds + modèles silver + tests dbt (prérequis : make ingest-all)
+	@test -d dbt/dbt_packages/dbt_utils || $(MAKE) dbt-deps
+	$(DBT) build $(DBT_OPTIONS)
+
+test-verite: ## Compare chaque slv_* à data/_verite/ (prérequis : make ingest-all dbt-build)
+	uv run pytest tests/test_silver_verite.py
+
 lint: ## Vérifie le style (ruff check + ruff format --check)
 	uv run ruff check .
 	uv run ruff format --check .
@@ -71,4 +86,4 @@ test: ## Lance les tests rapides (hors tests longs « slow »)
 test-all: ## Lance tous les tests, tests longs compris
 	uv run pytest
 
-check: lint typecheck test-all ## Lint + typecheck + tous les tests
+check: lint typecheck dbt-build test-all ## Lint + typecheck + dbt build + tous les tests

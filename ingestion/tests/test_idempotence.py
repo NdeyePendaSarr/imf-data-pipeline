@@ -93,7 +93,7 @@ def test_relance_meme_jour(env: Environnement) -> None:
         "SELECT objet, statut, nb_lignes FROM bronze._ingestions WHERE id_run = %s",
         (f"{jour.isoformat()}#2",),
     )
-    assert len(statuts) == 12
+    assert len(statuts) == len(TABLES_BRONZE)
     # … et ne contient aucune ligne CHARGE : uniquement IGNORE ou VIDE, sans aucune ligne chargée.
     assert {statut for _, statut, _ in statuts} <= {"IGNORE", "VIDE"}
     assert all(nb == 0 for _, _, nb in statuts)
