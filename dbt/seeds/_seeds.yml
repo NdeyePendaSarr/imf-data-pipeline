@@ -2,11 +2,18 @@ version: 2
 
 seeds:
   - name: plan_comptes
-    description: Plan de comptes simplifié à codes internes (cadrage phase 0), correspondances SYSCOHADA indicatives.
+    description: >
+      Plan de comptes simplifié à codes internes (cadrage phase 0), correspondances SYSCOHADA
+      indicatives. v0.5 (H8) : rubrique_solde_inverse = rubrique où classer le compte si son solde
+      est inversé (comptes de liaison non compensés, D13) ; vide pour les autres comptes.
     config:
       column_types:
         compte_sfd: text
         compte_syscohada_equiv: text
+        rubrique_solde_inverse: text
+    columns:
+      - name: rubrique_solde_inverse
+        description: Rubrique de reclassement d'un solde inversé (P3_DETTES_TRESORERIE pour les liaisons).
   - name: mapping_comptable
     description: Règles d'écriture par type d'événement (sens, compte, champ montant), dont APPRO_CAISSE (D18).
   - name: mapping_canal_tresorerie

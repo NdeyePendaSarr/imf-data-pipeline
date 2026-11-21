@@ -7,7 +7,7 @@ version: 2
 #   4 Remboursement mobile de 30 000 XOF      MOB  TRESO_LIAISON_MM D / CREDITS_SAINS C 25 000,
 #     (25 000 capital, 4 500 intérêts, 500 pénalités)    PRODUIT_INTERETS C 4 500, PRODUIT_PENALITES C 500
 #   Total : 356 000 au débit = 356 000 au crédit, 4 pièces, 10 lignes.
-# Les règles et canaux fournis sont ceux des seeds v0.4 pour ces quatre événements ; la règle
+# Les règles et canaux fournis sont ceux des seeds v0.5 pour ces quatre événements ; la règle
 # DOTATION_DEPRECIATION (mvp = false) vérifie qu'une règle hors MVP n'est jamais appliquée.
 # Le second cas du cadrage sera ajouté par Ndeye Penda.
 
@@ -19,7 +19,7 @@ unit_tests:
     model: fct_ecritures
     overrides:
       vars:
-        version_mapping: v0.4
+        version_mapping: v0.5
     given:
       - input: ref('int_evenements_comptables')
         rows:
@@ -59,13 +59,13 @@ unit_tests:
           - {code_journal: OD, priorite: 3, type_evenement: null}
     expect:
       rows:
-        - {id_ecriture: "credits:CRD_TEST:DECAISSEMENT", num_ligne: 1, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: CREDITS_SAINS, debit: 300000, credit: 0, type_evenement: DECAISSEMENT, source_table: credits, source_id: CRD_TEST, version_mapping: v0.4}
-        - {id_ecriture: "credits:CRD_TEST:DECAISSEMENT", num_ligne: 2, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: DEPOTS_EPARGNE, debit: 0, credit: 300000, type_evenement: DECAISSEMENT, source_table: credits, source_id: CRD_TEST, version_mapping: v0.4}
-        - {id_ecriture: "credits:CRD_TEST:FRAIS_DOSSIER", num_ligne: 1, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: DEPOTS_EPARGNE, debit: 6000, credit: 0, type_evenement: FRAIS_DOSSIER, source_table: credits, source_id: CRD_TEST, version_mapping: v0.4}
-        - {id_ecriture: "credits:CRD_TEST:FRAIS_DOSSIER", num_ligne: 2, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: PRODUIT_FRAIS_DOSSIER, debit: 0, credit: 6000, type_evenement: FRAIS_DOSSIER, source_table: credits, source_id: CRD_TEST, version_mapping: v0.4}
-        - {id_ecriture: "operations:OPE_TEST:DEPOT", num_ligne: 1, date_ecriture: 2025-03-05, code_journal: CAI, id_agence: AG_TEST, code_compte: TRESO_CAISSE, debit: 20000, credit: 0, type_evenement: DEPOT, source_table: operations, source_id: OPE_TEST, version_mapping: v0.4}
-        - {id_ecriture: "operations:OPE_TEST:DEPOT", num_ligne: 2, date_ecriture: 2025-03-05, code_journal: CAI, id_agence: AG_TEST, code_compte: DEPOTS_EPARGNE, debit: 0, credit: 20000, type_evenement: DEPOT, source_table: operations, source_id: OPE_TEST, version_mapping: v0.4}
-        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 1, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: TRESO_LIAISON_MM, debit: 30000, credit: 0, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.4}
-        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 2, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: CREDITS_SAINS, debit: 0, credit: 25000, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.4}
-        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 3, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: PRODUIT_INTERETS, debit: 0, credit: 4500, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.4}
-        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 4, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: PRODUIT_PENALITES, debit: 0, credit: 500, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.4}
+        - {id_ecriture: "credits:CRD_TEST:DECAISSEMENT", num_ligne: 1, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: CREDITS_SAINS, debit: 300000, credit: 0, type_evenement: DECAISSEMENT, source_table: credits, source_id: CRD_TEST, version_mapping: v0.5}
+        - {id_ecriture: "credits:CRD_TEST:DECAISSEMENT", num_ligne: 2, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: DEPOTS_EPARGNE, debit: 0, credit: 300000, type_evenement: DECAISSEMENT, source_table: credits, source_id: CRD_TEST, version_mapping: v0.5}
+        - {id_ecriture: "credits:CRD_TEST:FRAIS_DOSSIER", num_ligne: 1, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: DEPOTS_EPARGNE, debit: 6000, credit: 0, type_evenement: FRAIS_DOSSIER, source_table: credits, source_id: CRD_TEST, version_mapping: v0.5}
+        - {id_ecriture: "credits:CRD_TEST:FRAIS_DOSSIER", num_ligne: 2, date_ecriture: 2025-03-03, code_journal: OD, id_agence: AG_TEST, code_compte: PRODUIT_FRAIS_DOSSIER, debit: 0, credit: 6000, type_evenement: FRAIS_DOSSIER, source_table: credits, source_id: CRD_TEST, version_mapping: v0.5}
+        - {id_ecriture: "operations:OPE_TEST:DEPOT", num_ligne: 1, date_ecriture: 2025-03-05, code_journal: CAI, id_agence: AG_TEST, code_compte: TRESO_CAISSE, debit: 20000, credit: 0, type_evenement: DEPOT, source_table: operations, source_id: OPE_TEST, version_mapping: v0.5}
+        - {id_ecriture: "operations:OPE_TEST:DEPOT", num_ligne: 2, date_ecriture: 2025-03-05, code_journal: CAI, id_agence: AG_TEST, code_compte: DEPOTS_EPARGNE, debit: 0, credit: 20000, type_evenement: DEPOT, source_table: operations, source_id: OPE_TEST, version_mapping: v0.5}
+        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 1, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: TRESO_LIAISON_MM, debit: 30000, credit: 0, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.5}
+        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 2, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: CREDITS_SAINS, debit: 0, credit: 25000, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.5}
+        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 3, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: PRODUIT_INTERETS, debit: 0, credit: 4500, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.5}
+        - {id_ecriture: "remboursements:RMB_TEST:REMBOURSEMENT", num_ligne: 4, date_ecriture: 2025-04-03, code_journal: MOB, id_agence: AG_TEST, code_compte: PRODUIT_PENALITES, debit: 0, credit: 500, type_evenement: REMBOURSEMENT, source_table: remboursements, source_id: RMB_TEST, version_mapping: v0.5}

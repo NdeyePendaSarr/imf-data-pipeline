@@ -298,6 +298,15 @@ models:
       - name: mvp
         data_type: boolean
         data_tests: [not_null]
+      - name: rubrique_solde_inverse
+        data_type: text
+        description: >
+          Rubrique de reclassement si le solde du compte est inversé (H8) : P3_DETTES_TRESORERIE
+          pour TRESO_LIAISON_MM et TRESO_LIAISON_AGENT (non compensés, D13), vide sinon.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [P3_DETTES_TRESORERIE]
 
   - name: dim_journal
     description: Journaux comptables (seed journaux) et leur règle d'affectation.

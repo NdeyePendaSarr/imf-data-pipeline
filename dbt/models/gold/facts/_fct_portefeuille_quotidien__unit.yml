@@ -1,6 +1,7 @@
 version: 2
 
-# Test unitaire de fct_portefeuille_quotidien : frontière du PAR 30.
+# Test unitaire de fct_portefeuille_quotidien : frontière du PAR 30, en jours calendaires (H1).
+# Le dimanche 02/03/2025 a sa ligne (est_jour_ouvre = false) : le retard y compte 29 jours.
 # Crédit CRD_RETARD de 100 000 XOF décaissé le 02/01/2025, aucune échéance payée.
 #   Échéance 1 prévue le 01/02/2025 (50 000 + 1 000), échéance 2 le 01/03/2025 (50 000 + 500).
 #   Le 03/03/2025, la plus ancienne échéance impayée a 30 jours de retard : tranche 1-30, hors PAR 30.
@@ -18,6 +19,7 @@ unit_tests:
     given:
       - input: ref('dim_date')
         rows:
+          - {date: 2025-03-02, dans_exercice: true, est_jour_ouvre: false}
           - {date: 2025-03-03, dans_exercice: true, est_jour_ouvre: true}
           - {date: 2025-03-04, dans_exercice: true, est_jour_ouvre: true}
       - input: ref('dim_credit')
@@ -38,7 +40,9 @@ unit_tests:
           - {id_remboursement: RMB_A_JOUR, id_credit: CRD_A_JOUR, date_remboursement: 2025-02-01, part_capital: 50000, part_interets: 1000, penalites: 0, montant_paye: 51000}
     expect:
       rows:
-        - {date: 2025-03-03, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 30, tranche_retard: "1-30"}
-        - {date: 2025-03-04, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 31, tranche_retard: "31-90"}
-        - {date: 2025-03-03, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 2, tranche_retard: "1-30"}
-        - {date: 2025-03-04, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 3, tranche_retard: "1-30"}
+        - {date: 2025-03-02, est_jour_ouvre: false, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 29, tranche_retard: "1-30"}
+        - {date: 2025-03-03, est_jour_ouvre: true, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 30, tranche_retard: "1-30"}
+        - {date: 2025-03-04, est_jour_ouvre: true, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 31, tranche_retard: "31-90"}
+        - {date: 2025-03-02, est_jour_ouvre: false, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 1, tranche_retard: "1-30"}
+        - {date: 2025-03-03, est_jour_ouvre: true, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 2, tranche_retard: "1-30"}
+        - {date: 2025-03-04, est_jour_ouvre: true, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 3, tranche_retard: "1-30"}

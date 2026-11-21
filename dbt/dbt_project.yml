@@ -15,7 +15,7 @@ vars:
   exercice: 2025
   annees_apres_exercice: 2
   # Version des règles comptables (seeds du cadrage), tracée sur chaque ligne d'écriture.
-  version_mapping: 'v0.4'
+  version_mapping: 'v0.5'
 
 flags:
   # Aucune statistique d'usage envoyée à dbt Labs.

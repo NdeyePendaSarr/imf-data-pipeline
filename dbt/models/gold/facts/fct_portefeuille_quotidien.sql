@@ -1,14 +1,16 @@
--- Portefeuille quotidien (G11) : un crédit × un jour ouvré de l'exercice, du décaissement tant que
--- l'encours est > 0. À chaque jour d :
+-- Portefeuille quotidien (G11, H1) : un crédit × un jour calendaire de l'exercice, du décaissement
+-- jusqu'au solde du crédit (encours > 0) ou au 31/12. Un encours est un stock et le retard se
+-- compte en jours calendaires : les fins de mois du dimanche (31/08, 30/11) ont leur ligne.
+-- est_jour_ouvre (lundi à samedi) permet de filtrer les jours d'activité. À chaque jour d :
 --   encours      = montant accordé − capital remboursé jusqu'à d inclus ;
 --   jours_retard = d − date prévue de la plus ancienne échéance échue non couverte à d (0 sinon),
 --                  même imputation FIFO cumulée que fct_echeances (pénalités exclues) ;
 --   tranche_retard : 0, 1-30, 31-90, 91-180, >180. PAR 30 = encours des crédits à plus de 30 jours.
 
 with jours as (
-    select date as jour
+    select date as jour, est_jour_ouvre
     from {{ ref('dim_date') }}
-    where dans_exercice and est_jour_ouvre
+    where dans_exercice
 ),
 
 credits as (
@@ -46,6 +48,7 @@ credit_jour as (
     select
         c.id_credit, c.id_client, c.id_agence, c.code_produit, c.montant_accorde,
         j.jour,
+        j.est_jour_ouvre,
         coalesce(cu.capital_rembourse, 0) as capital_rembourse,
         coalesce(cu.cumul_paye, 0) as cumul_paye
     from credits as c
@@ -69,6 +72,7 @@ retards as (
 portefeuille as (
     select
         cj.jour,
+        cj.est_jour_ouvre,
         cj.id_credit,
         cj.id_client,
         cj.id_agence,
@@ -81,6 +85,7 @@ portefeuille as (
 
 select
     cast(jour as date) as date,
+    cast(est_jour_ouvre as boolean) as est_jour_ouvre,
     cast(id_credit as text) as id_credit,
     cast(id_client as text) as id_client,
     cast(id_agence as text) as id_agence,

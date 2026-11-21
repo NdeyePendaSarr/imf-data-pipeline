@@ -10,5 +10,7 @@ select
     cast(compte_sfd as text) as compte_sfd,
     cast(compte_syscohada_equiv as text) as compte_syscohada_equiv,
     cast(statut_correspondance as text) as statut_correspondance,
-    cast(mvp as boolean) as mvp
+    cast(mvp as boolean) as mvp,
+    -- v0.5 (H8) : rubrique où classer le compte si son solde est inversé (liaisons MM et agents).
+    cast(rubrique_solde_inverse as text) as rubrique_solde_inverse
 from {{ ref('plan_comptes') }}

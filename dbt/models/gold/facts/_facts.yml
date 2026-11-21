@@ -328,7 +328,7 @@ models:
                 min_value: 0
   - name: fct_portefeuille_quotidien
     description: >
-      Portefeuille quotidien (G11) : un crédit × un jour ouvré de l'exercice, du décaissement tant que l'encours est > 0 ; encours, jours de retard, tranche de retard. Base du PAR 30.
+      Portefeuille quotidien (G11, H1) : un crédit × un jour calendaire de l'exercice, du décaissement jusqu'au solde du crédit ou au 31/12 ; encours, jours de retard, tranche de retard. Base du PAR 30.
     config:
       contract:
         enforced: true
@@ -345,6 +345,11 @@ models:
               arguments:
                 to: ref('dim_date')
                 field: date
+      - name: est_jour_ouvre
+        data_type: boolean
+        description: "Vrai du lundi au samedi (jours d'activité du guichet et des agents)."
+        data_tests:
+          - not_null
       - name: id_credit
         data_type: text
         data_tests:
