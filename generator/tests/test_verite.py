@@ -4,7 +4,7 @@ Les contrôles sont recalculés à partir des tables, indépendamment de la simu
 """
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -273,16 +273,13 @@ def test_date_maj_dans_l_exercice(petite_generation: Generation) -> None:
 
 
 def test_date_maj_metier(petite_generation: Generation) -> None:
-    """date_maj = date de l'événement (crédit : décaissement, ou date du solde)."""
+    """date_maj = date de l'événement (crédit : décaissement, SOLDE compris, I10)."""
     v = petite_generation.verite
     decaissement = {c.id_credit: c.date_decaissement for c in v.credits}
-    dernier: dict[str, date] = {}
     for r in v.remboursements:
         assert r.date_maj.date() == r.date_remboursement
-        dernier[r.id_credit] = max(r.date_remboursement, dernier.get(r.id_credit, date.min))
     for c in v.credits:
-        attendu = dernier[c.id_credit] if c.statut == "SOLDE" else c.date_decaissement
-        assert c.date_maj.date() == attendu
+        assert c.date_maj.date() == c.date_decaissement
     assert all(e.date_maj.date() == decaissement[e.id_credit] for e in v.echeancier)
     assert all(c.date_maj.date() == c.date_adhesion for c in v.clients)
 
@@ -335,15 +332,11 @@ def test_regle_date_maj_filigrane(generation_par_seed: Generation) -> None:
             credits[e.id_credit].date_decaissement, cfg.HEURE_DATE_MAJ
         )
 
-    # Crédit SOLDE : date du solde (dernier remboursement), distincte du décaissement.
-    dernier: dict[str, date] = {}
-    for r in v.remboursements:
-        dernier[r.id_credit] = max(r.date_remboursement, dernier.get(r.id_credit, date.min))
+    # Crédits (I10) : date de décaissement à 20:00, SOLDE compris.
     soldes = [c for c in v.credits if c.statut == "SOLDE"]
     assert soldes, "la petite configuration doit contenir des crédits soldés"
-    for c in soldes:
-        assert c.date_maj == datetime.combine(dernier[c.id_credit], cfg.HEURE_DATE_MAJ)
-        assert c.date_maj.date() != c.date_decaissement
+    for c in v.credits:
+        assert c.date_maj == datetime.combine(c.date_decaissement, cfg.HEURE_DATE_MAJ)
 
     # Remboursements de la vérité : date_maj = date du remboursement à 20:00.
     for r in v.remboursements:
@@ -357,3 +350,44 @@ def test_regle_date_maj_filigrane(generation_par_seed: Generation) -> None:
     credits_bruts = {c.id_credit: c for c in b.credits}
     for r in ajoutes:
         assert r.date_maj == credits_bruts[r.id_credit].date_maj
+
+
+def test_parents_visibles_avant_leurs_enfants(petite_generation: Generation) -> None:
+    """Pour chaque jour J : toute ligne enfant de date_maj < J+1 a un parent de date_maj < J+1.
+
+    Garantit qu'une ingestion incrémentale arrêtée à J ne contient jamais d'orphelin :
+    echeancier et remboursements → credits, credits → clients et comptes, comptes → clients.
+    Contrôlé sur les sorties brutes (ce qui est ingéré), anomalies comprises.
+    """
+    b = petite_generation.brut
+    config = petite_generation.config
+    liens = {
+        "echeancier": [("credits", "id_credit", "id_credit")],
+        "remboursements": [("credits", "id_credit", "id_credit")],
+        "credits": [
+            ("clients", "id_client", "id_client"),
+            ("comptes", "id_compte_epargne", "id_compte"),
+        ],
+        "comptes": [("clients", "id_client", "id_client")],
+    }
+    cles = {"clients": "id_client", "comptes": "id_compte", "credits": "id_credit"}
+    # Lignes de chaque table rangées par jour de date_maj.
+    par_jour: dict[str, dict[date, list[object]]] = {}
+    for table in set(liens) | set(cles):
+        par_jour[table] = defaultdict(list)
+        for ligne in getattr(b, table):
+            par_jour[table][ligne.date_maj.date()].append(ligne)
+    visibles: dict[str, set[str]] = {table: set() for table in cles}
+    jour = config.debut
+    while jour <= config.fin:
+        # Parents dont date_maj < J+1 : ceux des jours ≤ J (les parents d'abord).
+        for table, cle in cles.items():
+            visibles[table].update(getattr(p, cle) for p in par_jour[table][jour])
+        for enfant, parents in liens.items():
+            for ligne in par_jour[enfant][jour]:
+                for parent, colonne, _ in parents:
+                    assert getattr(ligne, colonne) in visibles[parent], (enfant, jour, ligne)
+        jour += timedelta(days=1)
+    # Aucune ligne hors de l'exercice n'a échappé au contrôle.
+    for table in liens:
+        assert all(config.debut <= j <= config.fin for j in par_jour[table])

@@ -1028,7 +1028,9 @@ def simuler(config: Config) -> Verite:
                 len(p.echeances),
                 p.produit.taux_annuel,
                 "SOLDE" if solde else "EN_COURS",
-                horodatage(solde or p.debut),
+                # I10 : date_maj = décaissement pour tous les crédits, SOLDE compris. Le statut
+                # au 31/12 n'est pas historisé (la base simulée ne garde que l'état final).
+                horodatage(p.debut),
             )
         )
         # L'échéancier est connu dès le décaissement : date_maj = date de décaissement.

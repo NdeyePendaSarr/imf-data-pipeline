@@ -9,13 +9,23 @@ from generator.anomalies import ACCEPTER_NULL, DEDOUBLONNER, REJETER, STANDARDIS
 from generator.tests.conftest import lire_csv
 
 
-def _operations_brutes(sortie: Path) -> list[dict[str, str]]:
-    """Concatène les partitions journalières des opérations brutes."""
+def _partitions(sortie: Path, table: str) -> list[dict[str, str]]:
+    """Concatène les partitions journalières d'une table brute (I11)."""
     lignes: list[dict[str, str]] = []
-    for fichier in sorted((sortie / "operations").glob("date=*/operations.csv")):
-        assert fichier.parent.name == f"date={fichier.parent.name[5:]}"
-        lignes.extend(lire_csv(fichier))
+    for fichier in sorted((sortie / table).glob(f"date=*/{table}.csv")):
+        jour = fichier.parent.name.removeprefix("date=")
+        partition = lire_csv(fichier)
+        # Chaque partition ne contient que les lignes de son jour.
+        colonne = {"operations": "date_operation", "charges": "date_charge"}.get(
+            table, "date_appro"
+        )
+        assert partition and all(ligne[colonne] == jour for ligne in partition)
+        lignes.extend(partition)
     return lignes
+
+
+def _operations_brutes(sortie: Path) -> list[dict[str, str]]:
+    return _partitions(sortie, "operations")
 
 
 def _catalogue(sortie: Path) -> list[dict[str, str]]:
@@ -40,7 +50,7 @@ def test_chaque_ligne_du_catalogue_existe(petite_generation: Generation) -> None
     sortie = petite_generation.config.sortie
     brut = petite_generation.brut
     ops = Counter(o["id_operation"] for o in _operations_brutes(sortie))
-    charges = {c["id_charge"]: c for c in lire_csv(sortie / "charges.csv")}
+    charges = {c["id_charge"]: c for c in _partitions(sortie, "charges")}
     remboursements = {r.id_remboursement: r for r in brut.remboursements}
     credits = {c.id_credit: c for c in brut.credits}
     comptes = {c.id_compte for c in brut.comptes}
@@ -100,12 +110,16 @@ def test_traitements_redonnent_la_verite_csv(petite_generation: Generation) -> N
 
     # Charges
     charges = [
-        c for c in lire_csv(sortie / "charges.csv") if c["id_charge"] not in ids("charges", REJETER)
+        c for c in _partitions(sortie, "charges") if c["id_charge"] not in ids("charges", REJETER)
     ]
-    assert charges == lire_csv(sortie / "_verite" / "charges.csv")
+    cle_charges = lambda c: (c["date_charge"], c["id_charge"])  # noqa: E731
+    assert sorted(charges, key=cle_charges) == lire_csv(sortie / "_verite" / "charges.csv")
 
-    # Tables brutes sans anomalie : identiques octet pour octet.
-    for table in ("agences", "ouverture", "appro_caisse"):
+    # Approvisionnements : aucune anomalie, les partitions redonnent la vérité.
+    assert _partitions(sortie, "appro_caisse") == lire_csv(sortie / "_verite" / "appro_caisse.csv")
+
+    # Instantanés sans anomalie : identiques octet pour octet.
+    for table in ("agences", "ouverture"):
         brut = (sortie / f"{table}.csv").read_bytes()
         assert brut == (sortie / "_verite" / f"{table}.csv").read_bytes()
 

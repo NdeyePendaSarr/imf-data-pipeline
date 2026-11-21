@@ -47,8 +47,13 @@ CLASSES: dict[str, type[Any]] = {
     "appro_caisse": ApproCaisse,
 }
 TABLES = tuple(CLASSES)
-# Tables brutes livrées en CSV (les autres sont chargées dans imf_ops).
-TABLES_CSV_BRUTES = ("agences", "charges", "ouverture", "appro_caisse")
+# Tables brutes livrées en CSV : fichiers uniques (instantanés) et partitions journalières (I11).
+TABLES_CSV_BRUTES = ("agences", "ouverture")
+TABLES_PARTITIONNEES: dict[str, str] = {
+    "operations": "date_operation",
+    "charges": "date_charge",
+    "appro_caisse": "date_appro",
+}
 
 
 def formater(valeur: object) -> str:
@@ -105,13 +110,17 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
         ecrire_csv(sortie / f"{table}.csv", CLASSES[table], getattr(brut, table))
     ecrire_csv(sortie / "catalogue_anomalies.csv", LigneCatalogue, brut.catalogue)
 
-    # Opérations partitionnées par jour : un fichier par jour avec des opérations.
-    par_jour: dict[date, list[Operation]] = defaultdict(list)
-    for op in brut.operations:
-        par_jour[op.date_operation].append(op)
-    for jour in sorted(par_jour):
-        chemin = sortie / "operations" / f"date={jour.isoformat()}" / "operations.csv"
-        ecrire_csv(chemin, Operation, par_jour[jour])
+    # Opérations, charges et approvisionnements partitionnés par jour (I11) : un fichier par
+    # jour avec des lignes, data/<table>/date=AAAA-MM-JJ/<table>.csv.
+    nb_partitions: dict[str, int] = {}
+    for table, colonne_date in TABLES_PARTITIONNEES.items():
+        par_jour: dict[date, list[Any]] = defaultdict(list)
+        for ligne in getattr(brut, table):
+            par_jour[getattr(ligne, colonne_date)].append(ligne)
+        for jour in sorted(par_jour):
+            chemin = sortie / table / f"date={jour.isoformat()}" / f"{table}.csv"
+            ecrire_csv(chemin, CLASSES[table], par_jour[jour])
+        nb_partitions[f"partitions_{table}"] = len(par_jour)
 
     empreintes = {
         chemin.relative_to(sortie).as_posix(): sha256(chemin)
@@ -130,7 +139,8 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
         "lignes": {
             "verite": {t: len(getattr(verite, t)) for t in TABLES},
             "brut": {t: len(getattr(brut, t)) for t in TABLES}
-            | {"catalogue_anomalies": len(brut.catalogue), "partitions_operations": len(par_jour)},
+            | {"catalogue_anomalies": len(brut.catalogue)}
+            | nb_partitions,
         },
         "indicateurs": {
             "par30_31_12": round(float(ind.par30), 6),
