@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: int_mouvements_compte
+    description: >
+      Mouvements des comptes clients (S10), une ligne par mouvement et une seule source par
+      mouvement : DEPOT, RETRAIT, FRAIS_TENUE (slv_operations), DECAISSEMENT et FRAIS_DOSSIER
+      (slv_credits, sur le compte d'épargne du crédit), PRELEVEMENT (slv_remboursements au canal
+      PRELEVEMENT). Base des soldes de comptes et du rapprochement gestion ↔ comptabilité.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_mouvement
+        data_type: text
+        description: Identifiant déterministe et lisible, type_mouvement:source_id.
+        data_tests:
+          - unique
+          - not_null
+      - name: id_compte
+        data_type: text
+        description: Compte client mouvementé.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('slv_comptes')
+                field: id_compte
+      - name: date
+        data_type: date
+        description: Jour du mouvement.
+        data_tests:
+          - not_null
+      - name: type_mouvement
+        data_type: text
+        description: DEPOT, RETRAIT, FRAIS_TENUE, DECAISSEMENT, FRAIS_DOSSIER ou PRELEVEMENT.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [DEPOT, RETRAIT, FRAIS_TENUE, DECAISSEMENT, FRAIS_DOSSIER, PRELEVEMENT]
+      - name: montant_signe
+        data_type: bigint
+        description: Montant en XOF, positif s'il augmente le solde du compte, négatif sinon.
+        data_tests:
+          - not_null
+      - name: source_table
+        data_type: text
+        description: Modèle silver d'origine (slv_operations, slv_credits, slv_remboursements).
+      - name: source_id
+        data_type: text
+        description: Identifiant de la ligne d'origine dans source_table.
