@@ -1,0 +1,317 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Calendrier, un jour par ligne, du 01/01 de l'exercice (var exercice) au 31/12 de
+      exercice + annees_apres_exercice (échéances postérieures au 31/12). Jouée en plusieurs rôles.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: date
+        data_type: date
+        description: Jour (clé naturelle).
+        data_tests: [unique, not_null]
+      - name: annee
+        data_type: integer
+      - name: mois
+        data_type: integer
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 12
+      - name: annee_mois
+        data_type: text
+        description: Mois au format AAAA-MM.
+      - name: trimestre
+        data_type: integer
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4]
+                quote: false
+      - name: jour_semaine
+        data_type: integer
+        description: Jour ISO (1 = lundi … 7 = dimanche).
+      - name: exercice
+        data_type: integer
+        description: Exercice comptable du jour (année civile).
+      - name: dans_exercice
+        data_type: boolean
+        description: Vrai pour les jours de l'exercice analysé.
+      - name: est_fin_de_mois
+        data_type: boolean
+        description: Vrai le dernier jour calendaire du mois (arrêtés mensuels, balances).
+        data_tests: [not_null]
+      - name: est_jour_ouvre
+        data_type: boolean
+        description: Vrai du lundi au samedi (guichet et agents), sans jours fériés.
+        data_tests: [not_null]
+
+  - name: dim_agence
+    description: Agences de SenFinance, siège compris.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_agence
+        data_type: text
+        description: Clé naturelle de l'agence.
+        data_tests: [unique, not_null]
+      - name: nom
+        data_type: text
+      - name: ville
+        data_type: text
+      - name: region
+        data_type: text
+      - name: type_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [SIEGE, REGIONALE]
+      - name: est_siege
+        data_type: boolean
+        description: Vrai pour le siège (aucun client).
+
+  - name: dim_client
+    description: >
+      Clients, SCD 1. Âge et tranche d'âge au 31/12 de l'exercice (jamais current_date) ;
+      données manquantes → NON_RENSEIGNE.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_client
+        data_type: text
+        description: Clé naturelle du client.
+        data_tests: [unique, not_null]
+      - name: id_agence
+        data_type: text
+        description: Agence du client.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: sexe
+        data_type: text
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [F, M]
+      - name: date_naissance
+        data_type: date
+        description: Peut être NULL (ACCEPTER_NULL) ; tranche_age vaut alors NON_RENSEIGNE.
+      - name: age_au_31_12
+        data_type: integer
+        description: Âge révolu au 31/12 de l'exercice.
+      - name: tranche_age
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["18-25", "26-35", "36-45", "46-55", "56-65", "66+", NON_RENSEIGNE]
+      - name: secteur_activite
+        data_type: text
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [COMMERCE, AGRICULTURE, ELEVAGE, PECHE, ARTISANAT, TRANSPORT, SERVICES, NON_RENSEIGNE]
+      - name: date_adhesion
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+
+  - name: dim_compte_client
+    description: Comptes des clients (épargne ou courant) ; distinct du compte comptable.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_compte
+        data_type: text
+        description: Clé naturelle du compte client.
+        data_tests: [unique, not_null]
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: type_compte
+        data_type: text
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [EPARGNE, COURANT]
+      - name: statut
+        data_type: text
+      - name: date_ouverture
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+
+  - name: dim_produit_credit
+    description: Produits de crédit (taux, frais de dossier, durées, périodicité mensuelle).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: code_produit
+        data_type: text
+        description: Clé naturelle du produit.
+        data_tests: [unique, not_null]
+      - name: libelle
+        data_type: text
+      - name: taux_annuel
+        data_type: numeric(6,4)
+      - name: taux_frais_dossier
+        data_type: numeric(6,4)
+      - name: duree_min_mois
+        data_type: smallint
+      - name: duree_max_mois
+        data_type: smallint
+      - name: periodicite
+        data_type: text
+
+  - name: dim_credit
+    description: >
+      Crédits et leurs conditions d'octroi. statut_au_31_12 reflète l'état au 31/12 dès le
+      décaissement (I10) : ne jamais l'utiliser pour une analyse à date.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_credit
+        data_type: text
+        description: Clé naturelle du crédit.
+        data_tests: [unique, not_null]
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: id_compte_epargne
+        data_type: text
+        description: Compte d'épargne sur lequel le crédit est versé.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_compte_client')
+                field: id_compte
+      - name: code_produit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_produit_credit')
+                field: code_produit
+      - name: date_decaissement
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: montant_accorde
+        data_type: bigint
+      - name: frais_dossier
+        data_type: bigint
+      - name: duree_mois
+        data_type: smallint
+      - name: taux_annuel
+        data_type: numeric(6,4)
+      - name: statut_au_31_12
+        data_type: text
+        description: EN_COURS ou SOLDE au 31/12 de l'exercice (nom conservé volontairement).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [EN_COURS, SOLDE]
+
+  - name: dim_compte_comptable
+    description: >
+      Plan de comptes simplifié (seed plan_comptes), codes internes ; correspondances SYSCOHADA
+      indicatives. mvp = compte utilisé au MVP.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: code_compte
+        data_type: text
+        description: Clé naturelle du compte comptable (code interne).
+        data_tests: [unique, not_null]
+      - name: libelle
+        data_type: text
+      - name: nature
+        data_type: text
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [ACTIF, PASSIF, CHARGE, PRODUIT]
+      - name: sens_normal
+        data_type: text
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [D, C]
+      - name: etat
+        data_type: text
+        description: BILAN ou CR (compte de résultat).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [BILAN, CR]
+      - name: rubrique
+        data_type: text
+        data_tests: [not_null]
+      - name: compte_sfd
+        data_type: text
+      - name: compte_syscohada_equiv
+        data_type: text
+      - name: statut_correspondance
+        data_type: text
+      - name: mvp
+        data_type: boolean
+        data_tests: [not_null]
+
+  - name: dim_journal
+    description: Journaux comptables (seed journaux) et leur règle d'affectation.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: code_journal
+        data_type: text
+        description: Clé naturelle du journal.
+        data_tests: [unique, not_null]
+      - name: libelle
+        data_type: text
+      - name: priorite
+        data_type: integer
+      - name: regle
+        data_type: text

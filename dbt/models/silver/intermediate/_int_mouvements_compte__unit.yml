@@ -4,18 +4,19 @@ version: 2
 # d'un prélèvement. Compte CPT_TEST :
 #   crédit CRD_TEST de 300 000 XOF avec 6 000 XOF de frais de dossier (décaissé le 03/03/2025) ;
 #   dépôt au guichet de 20 000 XOF ;
+#   retrait de 50 000 XOF par un agent (second cas du cadrage) et frais de tenue de 500 XOF ;
 #   remboursement de 30 000 XOF par PRELEVEMENT → débite le compte ;
 #   remboursement de 30 000 XOF par MOBILE → payé hors du compte : aucun mouvement (cas négatif).
-# Solde attendu : 300 000 − 6 000 + 20 000 − 30 000 = 284 000 XOF (somme des montant_signe
+# Solde attendu : 300 000 − 6 000 + 20 000 − 50 000 − 500 − 30 000 = 233 500 XOF (somme des montant_signe
 # attendus ci-dessous ; un test unitaire dbt ne s'applique qu'à un modèle, pas à un test
 # singulier, et aucun modèle ne calcule encore de solde).
 
 unit_tests:
   - name: int_mouvements_compte_exemple_cadrage
     description: >
-      Exemple du cadrage phase 0 §4 : décaissement (+), frais de dossier (−), dépôt (+) et
-      prélèvement (−) sur le compte d'épargne du crédit ; le remboursement MOBILE ne mouvemente
-      pas le compte.
+      Exemple du cadrage phase 0 §4 : décaissement (+), frais de dossier (−), dépôt (+),
+      retrait (−), frais de tenue (−) et prélèvement (−) sur le compte d'épargne du crédit ;
+      le remboursement MOBILE ne mouvemente pas le compte.
     model: int_mouvements_compte
     given:
       - input: ref('slv_credits')
@@ -38,6 +39,20 @@ unit_tests:
             type_operation: DEPOT
             canal: GUICHET
             montant: 20000
+          - id_operation: OPE_RETRAIT
+            id_compte: CPT_TEST
+            id_agence: AG_TEST
+            date_operation: 2025-03-10
+            type_operation: RETRAIT
+            canal: AGENT
+            montant: 50000
+          - id_operation: OPE_FRAIS_TENUE
+            id_compte: CPT_TEST
+            id_agence: AG_TEST
+            date_operation: 2025-03-31
+            type_operation: FRAIS_TENUE
+            canal: GUICHET
+            montant: 500
       - input: ref('slv_remboursements')
         rows:
           - id_remboursement: RMB_PRELEVEMENT
@@ -79,6 +94,20 @@ unit_tests:
           montant_signe: 20000
           source_table: slv_operations
           source_id: OPE_TEST
+        - id_mouvement: "RETRAIT:OPE_RETRAIT"
+          id_compte: CPT_TEST
+          date: 2025-03-10
+          type_mouvement: RETRAIT
+          montant_signe: -50000
+          source_table: slv_operations
+          source_id: OPE_RETRAIT
+        - id_mouvement: "FRAIS_TENUE:OPE_FRAIS_TENUE"
+          id_compte: CPT_TEST
+          date: 2025-03-31
+          type_mouvement: FRAIS_TENUE
+          montant_signe: -500
+          source_table: slv_operations
+          source_id: OPE_FRAIS_TENUE
         - id_mouvement: "PRELEVEMENT:RMB_PRELEVEMENT"
           id_compte: CPT_TEST
           date: 2025-04-03

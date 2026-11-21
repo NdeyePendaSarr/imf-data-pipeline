@@ -11,7 +11,9 @@ import psycopg
 from ingestion.config import ErreurIngestion
 
 # Clés du manifeste qui ne dépendent que de la génération (aucun horodatage d'exécution).
-CLES_DETERMINISTES = ("parametres", "lignes", "indicateurs", "fichiers")
+# « imf_ops » : SHA-256 du contenu de chaque table chargée dans imf_ops (comble le trou de I12 :
+# une génération qui ne change que imf_ops change désormais l'empreinte).
+CLES_DETERMINISTES = ("parametres", "lignes", "indicateurs", "fichiers", "imf_ops")
 
 
 @dataclass(frozen=True)

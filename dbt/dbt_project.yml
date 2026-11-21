@@ -9,6 +9,12 @@ test-paths: ["tests"]
 macro-paths: ["macros"]
 clean-targets: ["target", "dbt_packages"]
 
+vars:
+  # Exercice analysé (année civile). dim_date le couvre, ainsi que les 2 années suivantes où
+  # tombent encore des échéances (crédits jusqu'à 24 mois décaissés en décembre).
+  exercice: 2025
+  annees_apres_exercice: 2
+
 flags:
   # Aucune statistique d'usage envoyée à dbt Labs.
   send_anonymous_usage_stats: false
@@ -24,6 +30,11 @@ models:
         +materialized: view
       intermediate:
         +materialized: table
+
+    gold:
+      # Gold : dimensions et faits du schéma en étoile, tables reconstruites (S14).
+      +schema: gold
+      +materialized: table
 
 seeds:
   imf_dwh:

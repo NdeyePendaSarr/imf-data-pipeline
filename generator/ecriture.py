@@ -79,6 +79,30 @@ def ecrire_csv(chemin: Path, classe: type[Any], lignes: Sequence[Any]) -> None:
             writer.writerow([formater(v) for v in astuple(ligne)])
 
 
+# Tables chargées dans imf_ops (aucun fichier dans data/ : leur contenu est haché à part).
+TABLES_IMF_OPS = (
+    "produits_credit",
+    "clients",
+    "comptes",
+    "credits",
+    "echeancier",
+    "remboursements",
+)
+
+
+def empreinte_lignes(classe: type[Any], lignes: Sequence[Any]) -> str:
+    """SHA-256 du contenu d'une table, au format CSV canonique (en-tête + lignes formatées).
+
+    Sert à l'empreinte de génération : une seule ligne de imf_ops modifiée change le manifeste,
+    même si aucun fichier de data/ ne change (trou de I12 relevé en phase 4).
+    """
+    empreinte = hashlib.sha256()
+    empreinte.update((",".join(f.name for f in fields(classe)) + "\n").encode("utf-8"))
+    for ligne in lignes:
+        empreinte.update(("\x1f".join(formater(v) for v in astuple(ligne)) + "\n").encode("utf-8"))
+    return empreinte.hexdigest()
+
+
 def sha256(chemin: Path) -> str:
     """Empreinte SHA-256 d'un fichier."""
     return hashlib.sha256(chemin.read_bytes()).hexdigest()
@@ -152,6 +176,11 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
             "banque_minimale": ind.banque_minimale,
         },
         "fichiers": empreintes,
+        # Contenu des tables chargées dans imf_ops (brut, anomalies comprises).
+        "imf_ops": {
+            table: empreinte_lignes(CLASSES[table], getattr(brut, table))
+            for table in TABLES_IMF_OPS
+        },
     }
     with (sortie / MANIFESTE).open("w", encoding="utf-8", newline="\n") as fichier:
         json.dump(manifeste, fichier, ensure_ascii=False, indent=2, sort_keys=True)
