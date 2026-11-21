@@ -1,0 +1,88 @@
+version: 2
+
+# Test unitaire de int_mouvements_compte sur l'exemple chiffré du cadrage phase 0 §4, complété
+# d'un prélèvement. Compte CPT_TEST :
+#   crédit CRD_TEST de 300 000 XOF avec 6 000 XOF de frais de dossier (décaissé le 03/03/2025) ;
+#   dépôt au guichet de 20 000 XOF ;
+#   remboursement de 30 000 XOF par PRELEVEMENT → débite le compte ;
+#   remboursement de 30 000 XOF par MOBILE → payé hors du compte : aucun mouvement (cas négatif).
+# Solde attendu : 300 000 − 6 000 + 20 000 − 30 000 = 284 000 XOF (somme des montant_signe
+# attendus ci-dessous ; un test unitaire dbt ne s'applique qu'à un modèle, pas à un test
+# singulier, et aucun modèle ne calcule encore de solde).
+
+unit_tests:
+  - name: int_mouvements_compte_exemple_cadrage
+    description: >
+      Exemple du cadrage phase 0 §4 : décaissement (+), frais de dossier (−), dépôt (+) et
+      prélèvement (−) sur le compte d'épargne du crédit ; le remboursement MOBILE ne mouvemente
+      pas le compte.
+    model: int_mouvements_compte
+    given:
+      - input: ref('slv_credits')
+        rows:
+          - id_credit: CRD_TEST
+            id_client: CLI_TEST
+            id_compte_epargne: CPT_TEST
+            code_produit: AGR
+            date_decaissement: 2025-03-03
+            montant_accorde: 300000
+            frais_dossier: 6000
+            duree_mois: 6
+            statut_au_31_12: EN_COURS
+      - input: ref('slv_operations')
+        rows:
+          - id_operation: OPE_TEST
+            id_compte: CPT_TEST
+            id_agence: AG_TEST
+            date_operation: 2025-03-05
+            type_operation: DEPOT
+            canal: GUICHET
+            montant: 20000
+      - input: ref('slv_remboursements')
+        rows:
+          - id_remboursement: RMB_PRELEVEMENT
+            id_credit: CRD_TEST
+            date_remboursement: 2025-04-03
+            montant_paye: 30000
+            part_capital: 25000
+            part_interets: 5000
+            penalites: 0
+            canal: PRELEVEMENT
+          - id_remboursement: RMB_MOBILE
+            id_credit: CRD_TEST
+            date_remboursement: 2025-05-03
+            montant_paye: 30000
+            part_capital: 25000
+            part_interets: 4500
+            penalites: 500
+            canal: MOBILE
+    expect:
+      rows:
+        - id_mouvement: "DECAISSEMENT:CRD_TEST"
+          id_compte: CPT_TEST
+          date: 2025-03-03
+          type_mouvement: DECAISSEMENT
+          montant_signe: 300000
+          source_table: slv_credits
+          source_id: CRD_TEST
+        - id_mouvement: "FRAIS_DOSSIER:CRD_TEST"
+          id_compte: CPT_TEST
+          date: 2025-03-03
+          type_mouvement: FRAIS_DOSSIER
+          montant_signe: -6000
+          source_table: slv_credits
+          source_id: CRD_TEST
+        - id_mouvement: "DEPOT:OPE_TEST"
+          id_compte: CPT_TEST
+          date: 2025-03-05
+          type_mouvement: DEPOT
+          montant_signe: 20000
+          source_table: slv_operations
+          source_id: OPE_TEST
+        - id_mouvement: "PRELEVEMENT:RMB_PRELEVEMENT"
+          id_compte: CPT_TEST
+          date: 2025-04-03
+          type_mouvement: PRELEVEMENT
+          montant_signe: -30000
+          source_table: slv_remboursements
+          source_id: RMB_PRELEVEMENT

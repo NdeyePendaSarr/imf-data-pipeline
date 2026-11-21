@@ -69,9 +69,10 @@ models:
                 values:
                   - VIREMENT
                   - GUICHET
-          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
-          #     arguments:
-          #       source: ouverture
+          # Canal autorisé pour la source ouverture (seed canaux_autorises, D16).
+          - canal_autorise:
+              arguments:
+                nom_source: ouverture
       - name: montant
         data_type: bigint
         description: "Montant en XOF (entier, ≥ 0)."
@@ -142,9 +143,10 @@ models:
                   - GUICHET
                   - AGENT
                   - MOBILE
-          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
-          #     arguments:
-          #       source: operations
+          # Canal autorisé pour la source operations (seed canaux_autorises, D16).
+          - canal_autorise:
+              arguments:
+                nom_source: operations
       - name: montant
         data_type: bigint
         description: "Montant en XOF (entier, ≥ 0)."
@@ -207,9 +209,10 @@ models:
                 values:
                   - VIREMENT
                   - GUICHET
-          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
-          #     arguments:
-          #       source: charges
+          # Canal autorisé pour la source charges (seed canaux_autorises, D16).
+          - canal_autorise:
+              arguments:
+                nom_source: charges
       - name: montant
         data_type: bigint
         description: "Montant en XOF (entier, ≥ 0)."
@@ -606,9 +609,10 @@ models:
                   - AGENT
                   - MOBILE
                   - PRELEVEMENT
-          # - canal_autorise:            # test générique maison (écrit par Ndeye Penda)
-          #     arguments:
-          #       source: remboursements
+          # Canal autorisé pour la source remboursements (seed canaux_autorises, D16).
+          - canal_autorise:
+              arguments:
+                nom_source: remboursements
       - name: date_maj
         data_type: timestamp
         description: "Horodatage métier déterministe de imf_ops (filigrane de l'ingestion)."

@@ -225,8 +225,8 @@ make dbt-build     # seeds + modèles + tests (prérequis : make ingest-all)
 make test-verite   # chaque slv_* = data/_verite/<table>.csv (la vérité n'entre jamais en base)
 ```
 
-`dbt build` sur l'exercice par défaut : **148 PASS, 0 WARN, 0 ERROR** (5 seeds, 25 modèles,
-118 tests). Les tests de catalogue comparent les lignes écartées aux anomalies injectées :
+`dbt build` sur l'exercice par défaut : **153 PASS, 0 WARN, 0 ERROR** (5 seeds, 25 modèles,
+122 tests de données dont `canal_autorise`, 1 test unitaire de `int_mouvements_compte`). Les tests de catalogue comparent les lignes écartées aux anomalies injectées :
 
 | Nature (catalogue) | Table | Lignes du catalogue | Lignes attendues | Lignes écartées |
 |---|---|---:|---:|---:|
