@@ -80,6 +80,11 @@ class Environnement:
         with psycopg.connect(**parametres_connexion(self.parametres.base_dwh)) as conn:
             return conn.execute(requete.encode(), params).fetchall()
 
+    def requete_ops(self, requete: str, params: Sequence[Any] = ()) -> list[tuple[Any, ...]]:
+        """Exécute une requête de lecture sur la base imf_ops de l'environnement."""
+        with psycopg.connect(**parametres_connexion(self.parametres.base_ops)) as conn:
+            return conn.execute(requete.encode(), params).fetchall()
+
     def executer_ops(self, requete: str, params: Sequence[Any] = ()) -> None:
         """Modifie la base imf_ops de l'environnement (simulation d'un changement source)."""
         with psycopg.connect(**parametres_connexion(self.parametres.base_ops)) as conn:

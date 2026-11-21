@@ -4,7 +4,7 @@
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
 
-> 🚧 **Projet en construction** — phase 3 en cours : ingestion bronze incrémentale et idempotente.
+> 🚧 **Projet en construction** — phase 3 terminée, prochaine étape : nettoyage et standardisation avec dbt (silver).
 
 ## Objectif
 
@@ -24,8 +24,8 @@ remboursements, charges) en :
 | 0 | Cadrage : plan de comptes, schéma en étoile, règles de mapping | ✅ |
 | 1 | Socle : Docker, PostgreSQL, environnement Python | ✅ |
 | 2 | Générateur de données fictives et anomalies injectées | ✅ |
-| 3 | Ingestion incrémentale et idempotente (bronze) | 🚧 |
-| 4 | Nettoyage et standardisation avec dbt (silver) | ⬜ |
+| 3 | Ingestion incrémentale et idempotente (bronze) | ✅ |
+| 4 | Nettoyage et standardisation avec dbt (silver) | 🚧 |
 | 5 | Schéma en étoile et écritures comptables (gold) | ⬜ |
 | 6 | Balances, états financiers, KPI, rapprochements | ⬜ |
 | 7 | Orchestration Airflow | ⬜ |
