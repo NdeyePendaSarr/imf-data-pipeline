@@ -6,12 +6,14 @@ Les contrôles sont recalculés à partir des tables, indépendamment de la simu
 from collections import defaultdict
 from datetime import date, datetime
 
+import pytest
+
 from generator import config as cfg
-from generator.__main__ import Generation
+from generator.__main__ import Generation, generer
 from generator.echeancier import LigneEcheance, arrondi, teg_actuariel
 from generator.referentiels import SIEGE
 from generator.simulation import calculer_par30, est_ouvre
-from generator.tests.conftest import SEEDS, lire_csv
+from generator.tests.conftest import SEEDS, lire_csv, petite_config
 
 
 def _cumul_positif(flux: dict[tuple[str, date], int]) -> dict[str, int]:
@@ -304,9 +306,19 @@ def test_pas_de_paiement_futur(petite_generation: Generation) -> None:
     assert all(r.date_remboursement <= fin for r in v.remboursements)
 
 
-def test_regle_date_maj_filigrane(petite_generation: Generation) -> None:
+@pytest.fixture(scope="module", params=[42, 7, 2025], ids=lambda seed: f"seed={seed}")
+def generation_par_seed(
+    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
+) -> Generation:
+    """Petite configuration générée pour plusieurs seeds (règle indépendante de la seed)."""
+    seed: int = request.param
+    return generer(petite_config(tmp_path_factory.mktemp(f"seed{seed}") / "data", seed=seed))
+
+
+def test_regle_date_maj_filigrane(generation_par_seed: Generation) -> None:
     """Règle 9.1 : date_maj métier déterministe, filigrane de l'ingestion incrémentale."""
-    config, v, b = petite_generation.config, petite_generation.verite, petite_generation.brut
+    g = generation_par_seed
+    config, v, b = g.config, g.verite, g.brut
     tables = ("clients", "comptes", "produits_credit", "credits", "echeancier", "remboursements")
 
     # Tous les date_maj (vérité et brut) sont dans l'exercice, à 20:00:00.
@@ -333,12 +345,15 @@ def test_regle_date_maj_filigrane(petite_generation: Generation) -> None:
         assert c.date_maj == datetime.combine(dernier[c.id_credit], cfg.HEURE_DATE_MAJ)
         assert c.date_maj.date() != c.date_decaissement
 
-    # Brut : seuls les remboursements ajoutés (date_maj du crédit visé) s'écartent de la règle.
-    ecarts = [
-        r
-        for r in b.remboursements
-        if r.date_maj != datetime.combine(r.date_remboursement, cfg.HEURE_DATE_MAJ)
-    ]
-    ajoutes = [c for c in b.catalogue if c.table == "remboursements"]
-    assert len(ecarts) == len(ajoutes) > 0
-    assert {r.id_remboursement for r in ecarts} == {c.id_ligne for c in ajoutes}
+    # Remboursements de la vérité : date_maj = date du remboursement à 20:00.
+    for r in v.remboursements:
+        assert r.date_maj == datetime.combine(r.date_remboursement, cfg.HEURE_DATE_MAJ)
+
+    # Remboursements ajoutés par les anomalies : date_maj du crédit visé (ligne de référence).
+    ids_ajoutes = {c.id_ligne for c in b.catalogue if c.table == "remboursements"}
+    ajoutes = [r for r in b.remboursements if r.id_remboursement in ids_ajoutes]
+    assert ajoutes, "aucun remboursement ajouté par les anomalies"
+    assert len(ajoutes) == len(ids_ajoutes)
+    credits_bruts = {c.id_credit: c for c in b.credits}
+    for r in ajoutes:
+        assert r.date_maj == credits_bruts[r.id_credit].date_maj
