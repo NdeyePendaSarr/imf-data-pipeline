@@ -2,7 +2,8 @@
 # Chaque cible documentée par « ## » apparaît dans `make help`.
 
 .DEFAULT_GOAL := help
-.PHONY: help install up down logs reset-db psql-dwh psql-ops lint format typecheck test check
+.PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
+	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -31,6 +32,12 @@ psql-dwh: ## Ouvre psql sur l'entrepôt imf_dwh (dans le conteneur)
 psql-ops: ## Ouvre psql sur la base opérationnelle imf_ops (dans le conteneur)
 	docker compose exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d imf_ops'
 
+generate: ## Génère data/ et recharge imf_ops (configuration par défaut)
+	uv run python -m generator
+
+generate-small: ## Génère un petit jeu (100 clients, 150 crédits) et recharge imf_ops
+	uv run python -m generator --clients 100 --credits 150
+
 lint: ## Vérifie le style (ruff check + ruff format --check)
 	uv run ruff check .
 	uv run ruff format --check .
@@ -42,7 +49,10 @@ format: ## Corrige et formate le code avec ruff
 typecheck: ## Vérifie les types avec mypy (strict)
 	uv run mypy
 
-test: ## Lance les tests avec pytest
+test: ## Lance les tests rapides (hors tests longs « slow »)
+	uv run pytest -m "not slow"
+
+test-all: ## Lance tous les tests, tests longs compris
 	uv run pytest
 
-check: lint typecheck test ## Lint + typecheck + tests
+check: lint typecheck test-all ## Lint + typecheck + tous les tests

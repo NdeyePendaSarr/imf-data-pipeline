@@ -37,12 +37,13 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests"]
+files = ["tests", "generator"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "generator/tests"]
 pythonpath = ["."]
 addopts = "--strict-markers"
 markers = [
     "integration: tests nécessitant le PostgreSQL du projet (make up)",
+    "slow: tests longs sur la configuration par défaut (exclus de make test)",
 ]
