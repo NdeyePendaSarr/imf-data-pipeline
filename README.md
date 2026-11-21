@@ -4,7 +4,7 @@
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
 
-> 🚧 **Projet en construction** — phase 3 terminée, prochaine étape : nettoyage et standardisation avec dbt (silver).
+> 🚧 **Projet en construction** — phase 4 terminée, prochaine étape : schéma en étoile et écritures comptables (gold).
 
 ## Objectif
 
@@ -25,8 +25,8 @@ remboursements, charges) en :
 | 1 | Socle : Docker, PostgreSQL, environnement Python | ✅ |
 | 2 | Générateur de données fictives et anomalies injectées | ✅ |
 | 3 | Ingestion incrémentale et idempotente (bronze) | ✅ |
-| 4 | Nettoyage et standardisation avec dbt (silver) | 🚧 |
-| 5 | Schéma en étoile et écritures comptables (gold) | ⬜ |
+| 4 | Nettoyage et standardisation avec dbt (silver) | ✅ |
+| 5 | Schéma en étoile et écritures comptables (gold) | 🚧 |
 | 6 | Balances, états financiers, KPI, rapprochements | ⬜ |
 | 7 | Orchestration Airflow | ⬜ |
 | 8 | Dashboard Power BI | ⬜ |
@@ -48,8 +48,8 @@ Générateur Python ──► CSV d'agences + base opérationnelle (imf_ops)
 
 | | Outils |
 |---|---|
-| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose |
-| **Prévu** | dbt Core · Apache Airflow · Power BI · GitHub Actions |
+| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt_utils) |
+| **Prévu** | Apache Airflow · Power BI · GitHub Actions |
 
 ## Lancer le projet
 
@@ -65,6 +65,7 @@ make up                # démarre PostgreSQL
 make test              # tests rapides
 make generate          # génère data/ et remplit imf_ops
 make ingest-all        # ingère tout l'exercice dans bronze (imf_dwh)
+make dbt-build         # silver : seeds, modèles et tests dbt
 ```
 
 **Se connecter :**
@@ -198,15 +199,60 @@ a exactement le volume brut du manifeste :
 | `ops_echeancier` | 34 037 |
 | `ops_remboursements` | 11 918 |
 
+## Silver (dbt)
+
+```
+bronze ──► stg_<table> (vues) ──► slv_<table> (tables, contrat dbt) ──► int_mouvements_compte
+                │
+                └──────────────► slv_lignes_ecartees (motif + traitement + _source, _num_ligne)
+```
+
+- **stg_** : typage sûr des colonnes TEXT (`vers_bigint`, `vers_date` : sinon NULL et motif
+  TYPE_INVALIDE), codes standardisés `upper(trim())`, dernière version par clé pour imf_ops,
+  rang de doublon par identifiant pour les CSV, et **un seul** `motif_ecart` par ligne
+  (TYPE_INVALIDE > ORPHELIN_COMPTE > MONTANT_NEGATIF > CANAL_NON_AUTORISE > DATE_INCOHERENTE >
+  MONTANT_PAYE_INCOHERENT ; copie d'un doublon → DOUBLON_EXACT).
+- **slv_** : les lignes sans motif, avec les noms de colonnes de la source, `_id_run` et `_source`
+  (`credits.statut` devient `statut_au_31_12`). Aucun modèle incrémental.
+- **slv_lignes_ecartees** : tout ce qui n'est pas en silver, avec sa traçabilité bronze. Rien
+  n'est filtré en silence.
+- **int_mouvements_compte** : un mouvement par ligne sur un compte client (DEPOT, RETRAIT,
+  FRAIS_TENUE, DECAISSEMENT, FRAIS_DOSSIER, PRELEVEMENT), `montant_signe` > 0 s'il augmente le solde.
+
+```bash
+make dbt-deps      # installe dbt_utils
+make dbt-build     # seeds + modèles + tests (prérequis : make ingest-all)
+make test-verite   # chaque slv_* = data/_verite/<table>.csv (la vérité n'entre jamais en base)
+```
+
+`dbt build` sur l'exercice par défaut : **148 PASS, 0 WARN, 0 ERROR** (5 seeds, 25 modèles,
+118 tests). Les tests de catalogue comparent les lignes écartées aux anomalies injectées :
+
+| Nature (catalogue) | Table | Lignes du catalogue | Lignes attendues | Lignes écartées |
+|---|---|---:|---:|---:|
+| DOUBLON_EXACT | operations | 665 | 1 004 (copies) | 1 004 |
+| ORPHELIN_COMPTE | operations | 665 | 665 | 665 |
+| MONTANT_NEGATIF | operations | 665 | 665 | 665 |
+| CANAL_NON_AUTORISE | charges | 2 | 2 | 2 |
+| DATE_INCOHERENTE | remboursements | 117 | 117 | 117 |
+| MONTANT_PAYE_INCOHERENT | remboursements | 117 | 117 | 117 |
+| FORMAT_CANAL (STANDARDISER) | operations | 665 | 0 (corrigées, gardées) | 0 |
+| NULL_NON_CRITIQUE (ACCEPTER_NULL) | clients | 20 | 0 (gardées) | 0 |
+| **Total** | | | **2 570** | **2 570** |
+
+Silver obtenu (= vérité, ligne pour ligne) : 66 514 opérations, 227 charges, 141
+approvisionnements, 6 agences, 6 ouvertures, 4 produits, 2 000 clients, 2 317 comptes, 3 000
+crédits, 34 037 échéances, 11 684 remboursements ; 74 515 mouvements de comptes.
+
 ## Structure actuelle
 
 ```
 ├── docker/postgres/init/   # création des bases et des schémas
-├── dbt/seeds/              # plan de comptes et règles de mapping comptable
+├── dbt/                    # projet dbt : sources bronze, modèles et tests silver, seeds du cadrage
 ├── generator/              # générateur de données (vérité, anomalies, imf_ops) et ses tests
 ├── ingestion/              # ingestion bronze (fenêtres, extraction, chargement, journal) et ses tests
 ├── data/                   # sorties du générateur (non versionnées)
-├── tests/                  # tests du socle
+├── tests/                  # tests du socle et test silver = vérité
 ├── docker-compose.yml
 ├── Makefile
 └── pyproject.toml
