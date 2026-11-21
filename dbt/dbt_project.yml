@@ -42,6 +42,9 @@ seeds:
   imf_dwh:
     # Référentiels du cadrage (plan de comptes, mapping, canaux) dans le schéma silver (S2).
     +schema: silver
+    # Recréés à chaque build : un changement de colonnes (journaux v0.4) ne demande plus de
+    # --full-refresh manuel. Les vues qui en dépendent sont reconstruites dans le même build.
+    +full_refresh: true
     canaux_autorises:
       +column_types:
         source: text

@@ -76,3 +76,380 @@ models:
         data_type: text
         description: Version des règles comptables (var version_mapping).
         data_tests: [not_null]
+
+  - name: fct_operations
+    description: >
+      Opérations des comptes clients, une ligne par opération. est_activite_client = false pour FRAIS_TENUE (G12).
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_operation
+        data_type: text
+        description: "Clé de l'opération."
+        data_tests:
+          - unique
+          - not_null
+      - name: date_operation
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: id_compte
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_compte_client')
+                field: id_compte
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: type_operation
+        data_type: text
+        description: "DEPOT, RETRAIT ou FRAIS_TENUE (attribut dégénéré)."
+        data_tests:
+          - not_null
+      - name: canal
+        data_type: text
+        description: "Canal (attribut dégénéré)."
+        data_tests:
+          - not_null
+      - name: montant
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: est_activite_client
+        data_type: boolean
+        description: "Faux pour FRAIS_TENUE : exclu des KPI d'activité (G12)."
+        data_tests:
+          - not_null
+  - name: fct_remboursements
+    description: >
+      Remboursements, une ligne par remboursement, avec client, agence et produit du crédit.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: id_remboursement
+        data_type: text
+        data_tests:
+          - unique
+          - not_null
+      - name: id_credit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_credit')
+                field: id_credit
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: code_produit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_produit_credit')
+                field: code_produit
+      - name: date_remboursement
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: canal
+        data_type: text
+        data_tests:
+          - not_null
+      - name: montant_paye
+        data_type: bigint
+        description: "montant_paye = part_capital + part_interets + penalites (test singulier)."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: part_capital
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: part_interets
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: penalites
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+  - name: fct_echeances
+    description: >
+      Échéances (crédit × numéro) et leur couverture au 31/12 par imputation FIFO cumulée des paiements, pénalités exclues (G11).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_credit, num_echeance]
+    columns:
+      - name: id_credit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_credit')
+                field: id_credit
+      - name: num_echeance
+        data_type: smallint
+        data_tests:
+          - not_null
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: code_produit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_produit_credit')
+                field: code_produit
+      - name: date_prevue
+        data_type: date
+        description: "Date d'échéance prévue."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: capital_du
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: interets_dus
+        data_type: bigint
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: montant_du
+        data_type: bigint
+        description: "capital_du + interets_dus."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: montant_impute_au_31_12
+        data_type: bigint
+        description: "Part de l'échéance couverte au 31/12 (FIFO cumulé), entre 0 et montant_du."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: date_couverture
+        data_type: date
+        description: "Jour où l'échéance est entièrement couverte ; NULL si elle ne l'est pas au 31/12."
+      - name: jours_retard
+        data_type: integer
+        description: "(date_couverture ou 31/12) − date_prevue, borné à 0."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+  - name: fct_portefeuille_quotidien
+    description: >
+      Portefeuille quotidien (G11) : un crédit × un jour ouvré de l'exercice, du décaissement tant que l'encours est > 0 ; encours, jours de retard, tranche de retard. Base du PAR 30.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_credit, date]
+    columns:
+      - name: date
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: id_credit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_credit')
+                field: id_credit
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: code_produit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_produit_credit')
+                field: code_produit
+      - name: encours
+        data_type: bigint
+        description: "Capital restant dû à la fin du jour (0 < encours ≤ montant accordé)."
+        data_tests:
+          - not_null
+      - name: jours_retard
+        data_type: integer
+        description: "Jours depuis la plus ancienne échéance échue non couverte (0 sinon)."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: tranche_retard
+        data_type: text
+        description: "0, 1-30, 31-90, 91-180 ou >180."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["0", "1-30", "31-90", "91-180", ">180"]
+  - name: fct_solde_compte_mensuel
+    description: >
+      Solde de chaque compte client ouvert à chaque fin de mois de l'exercice (12 dates), cumul de int_mouvements_compte.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [id_compte, date_fin_mois]
+    columns:
+      - name: date_fin_mois
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: id_compte
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_compte_client')
+                field: id_compte
+      - name: id_client
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_client')
+                field: id_client
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: type_compte
+        data_type: text
+        data_tests:
+          - not_null
+      - name: solde
+        data_type: bigint
+        description: "Solde en fin de mois, jamais négatif."
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0

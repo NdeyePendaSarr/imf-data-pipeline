@@ -4,7 +4,7 @@
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
 
-> 🚧 **Projet en construction** — phase 4 terminée, prochaine étape : schéma en étoile et écritures comptables (gold).
+> 🚧 **Projet en construction** — phase 5 terminée, prochaine étape : balances, états financiers, KPI et rapprochements.
 
 ## Objectif
 
@@ -26,8 +26,8 @@ remboursements, charges) en :
 | 2 | Générateur de données fictives et anomalies injectées | ✅ |
 | 3 | Ingestion incrémentale et idempotente (bronze) | ✅ |
 | 4 | Nettoyage et standardisation avec dbt (silver) | ✅ |
-| 5 | Schéma en étoile et écritures comptables (gold) | 🚧 |
-| 6 | Balances, états financiers, KPI, rapprochements | ⬜ |
+| 5 | Schéma en étoile et écritures comptables (gold) | ✅ |
+| 6 | Balances, états financiers, KPI, rapprochements | 🚧 |
 | 7 | Orchestration Airflow | ⬜ |
 | 8 | Dashboard Power BI | ⬜ |
 | 9 | CI, documentation, entrepôt cloud | ⬜ |
@@ -65,7 +65,7 @@ make up                # démarre PostgreSQL
 make test              # tests rapides
 make generate          # génère data/ et remplit imf_ops
 make ingest-all        # ingère tout l'exercice dans bronze (imf_dwh)
-make dbt-build         # silver : seeds, modèles et tests dbt
+make dbt-build         # silver et gold : seeds, modèles et tests dbt
 ```
 
 **Se connecter :**
@@ -243,6 +243,32 @@ make test-verite   # chaque slv_* = data/_verite/<table>.csv (la vérité n'entr
 Silver obtenu (= vérité, ligne pour ligne) : 66 514 opérations, 227 charges, 141
 approvisionnements, 6 agences, 6 ouvertures, 4 produits, 2 000 clients, 2 317 comptes, 3 000
 crédits, 34 037 échéances, 11 684 remboursements ; 74 515 mouvements de comptes.
+
+## Gold (dbt) : schéma en étoile et écritures comptables
+
+- **Dimensions** (clés naturelles) : `dim_date` (exercice et 2 années d'échéances, 1 095 jours),
+  `dim_agence` (6, siège compris), `dim_client` (2 000, tranche d'âge au 31/12),
+  `dim_compte_client` (2 317), `dim_produit_credit` (4), `dim_credit` (3 000),
+  `dim_compte_comptable` (21, plan simplifié), `dim_journal` (7).
+- **Écritures** (`fct_ecritures`) : chaque événement de gestion devient une pièce en partie double
+  par jointure avec les règles du mapping comptable (seeds, version v0.4), le compte de trésorerie
+  résolu par le canal et le journal choisi par priorité. Aucune règle n'est écrite en dur dans le
+  SQL : changer une écriture, c'est changer un seed.
+- **Faits de gestion** : `fct_operations`, `fct_remboursements`, `fct_echeances` (couverture
+  FIFO au 31/12), `fct_portefeuille_quotidien` (un crédit × un jour ouvré : encours, jours et
+  tranche de retard), `fct_solde_compte_mensuel` (12 fins de mois).
+
+Résultats sur l'exercice par défaut :
+
+| Contrôle | Résultat |
+|---|---|
+| Pièces / lignes d'écriture | 84 572 pièces, 181 193 lignes (= tous les événements, 0 rejet) |
+| Équilibre débit = crédit | 13 140 567 531 XOF au débit et au crédit, chaque pièce équilibrée |
+| Caisse minimale (agence, fin de journée) | 3 002 580 XOF, égale à celle du générateur |
+| Banque minimale (fin de journée) | 163 883 235 XOF, égale à celle du générateur |
+| PAR 30 au 31/12 | 92 511 316 / 1 850 520 623 XOF, égal à la vérité au franc près (pytest) |
+| Lignes des faits | portefeuille quotidien 347 012, échéances 34 037, opérations 66 514, remboursements 11 684, soldes mensuels 14 946 |
+| `dbt build` | 352 PASS, 0 WARN, 0 ERROR (303 tests de données, 3 tests unitaires) |
 
 ## Structure actuelle
 

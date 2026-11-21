@@ -1,0 +1,44 @@
+version: 2
+
+# Test unitaire de fct_portefeuille_quotidien : frontière du PAR 30.
+# Crédit CRD_RETARD de 100 000 XOF décaissé le 02/01/2025, aucune échéance payée.
+#   Échéance 1 prévue le 01/02/2025 (50 000 + 1 000), échéance 2 le 01/03/2025 (50 000 + 500).
+#   Le 03/03/2025, la plus ancienne échéance impayée a 30 jours de retard : tranche 1-30, hors PAR 30.
+#   Le 04/03/2025, elle en a 31 : tranche 31-90, dans le PAR 30 (retard > 30 jours).
+# Le crédit CRD_A_JOUR a payé sa première échéance à temps (FIFO : elle est couverte) : encours
+# réduit du capital payé, et seule son échéance 2 du 01/03, non payée, compte : 2 puis 3 jours.
+
+unit_tests:
+  - name: fct_portefeuille_quotidien_frontiere_par30
+    description: >
+      Retard de 30 jours (tranche 1-30, hors PAR 30) puis de 31 jours (tranche 31-90, dans le
+      PAR 30) sur un crédit impayé ; sur un crédit dont l'échéance 1 est payée, le retard part
+      de l'échéance 2 (FIFO).
+    model: fct_portefeuille_quotidien
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-03-03, dans_exercice: true, est_jour_ouvre: true}
+          - {date: 2025-03-04, dans_exercice: true, est_jour_ouvre: true}
+      - input: ref('dim_credit')
+        rows:
+          - {id_credit: CRD_RETARD, id_client: CLI_TEST, code_produit: AGR, date_decaissement: 2025-01-02, montant_accorde: 100000}
+          - {id_credit: CRD_A_JOUR, id_client: CLI_TEST, code_produit: AGR, date_decaissement: 2025-01-02, montant_accorde: 100000}
+      - input: ref('dim_client')
+        rows:
+          - {id_client: CLI_TEST, id_agence: AG_TEST}
+      - input: ref('slv_echeancier')
+        rows:
+          - {id_credit: CRD_RETARD, num_echeance: 1, date_echeance: 2025-02-01, capital: 50000, interets: 1000}
+          - {id_credit: CRD_RETARD, num_echeance: 2, date_echeance: 2025-03-01, capital: 50000, interets: 500}
+          - {id_credit: CRD_A_JOUR, num_echeance: 1, date_echeance: 2025-02-01, capital: 50000, interets: 1000}
+          - {id_credit: CRD_A_JOUR, num_echeance: 2, date_echeance: 2025-03-01, capital: 50000, interets: 500}
+      - input: ref('slv_remboursements')
+        rows:
+          - {id_remboursement: RMB_A_JOUR, id_credit: CRD_A_JOUR, date_remboursement: 2025-02-01, part_capital: 50000, part_interets: 1000, penalites: 0, montant_paye: 51000}
+    expect:
+      rows:
+        - {date: 2025-03-03, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 30, tranche_retard: "1-30"}
+        - {date: 2025-03-04, id_credit: CRD_RETARD, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 100000, jours_retard: 31, tranche_retard: "31-90"}
+        - {date: 2025-03-03, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 2, tranche_retard: "1-30"}
+        - {date: 2025-03-04, id_credit: CRD_A_JOUR, id_client: CLI_TEST, id_agence: AG_TEST, code_produit: AGR, encours: 50000, jours_retard: 3, tranche_retard: "1-30"}
