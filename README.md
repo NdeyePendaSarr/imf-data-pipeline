@@ -98,6 +98,12 @@ injecte ensuite, avec un flux aléatoire séparé, des **anomalies** dans les so
 listée dans `data/catalogue_anomalies.csv` avec son traitement attendu. Appliquer ces traitements
 aux sorties brutes redonne exactement la vérité : c'est le contrat du futur nettoyage (silver).
 
+Les décaissements suivent une courbe mensuelle de croissance régulière (config.py), avec la
+saisonnalité des produits (AGRICOLE de mai à juillet, SCOLAIRE d'août à octobre) et sans
+rattrapage de fin d'année : un crédit qui ne trouve pas de client éligible dans son mois est
+abandonné. Aucun crédit en janvier : les premières adhésions datent du 01/01 et un crédit exige
+30 jours d'ancienneté du compte.
+
 | Sortie | Contenu |
 |---|---|
 | `imf_ops` (PostgreSQL) | clients, comptes, produits_credit, credits, echeancier, remboursements |
@@ -112,32 +118,32 @@ aux sorties brutes redonne exactement la vérité : c'est le contrat du futur ne
 | clients | 2 000 | 2 000 |
 | comptes | 2 317 | 2 317 |
 | credits | 3 000 | 3 000 |
-| echeancier | 34 352 | 34 352 |
-| remboursements | 7 365 | 7 513 |
-| operations (364 fichiers journaliers) | 66 282 | 68 609 |
-| charges | 227 | 229 |
-| appro_caisse | 152 | 152 |
-| catalogue_anomalies | — | 2 822 |
+| echeancier | 34 037 | 34 037 |
+| remboursements | 11 684 | 11 918 |
+| operations (365 fichiers journaliers) | 66 514 | 68 848 |
+| charges (83 fichiers journaliers) | 227 | 229 |
+| appro_caisse (104 fichiers journaliers) | 141 | 141 |
+| catalogue_anomalies | — | 2 916 |
 
 | Indicateur au 31/12/2025 | Valeur |
 |---|---:|
 | PAR 30 (encours en retard > 30 j / encours) | 5,00 % |
-| Encours total des crédits en cours | 2 284 329 328 XOF |
-| Encours en retard de plus de 30 jours | 114 207 065 XOF |
-| Capital d'ouverture | 1 999 000 000 XOF |
-| Approvisionnements de caisse | 152 |
-| Caisse minimale (agence, fin de journée) | 3 000 831 XOF |
-| Banque minimale (fin de journée) | 182 616 221 XOF |
+| Encours total des crédits en cours | 1 850 520 623 XOF |
+| Encours en retard de plus de 30 jours | 92 511 316 XOF |
+| Capital d'ouverture | 1 797 000 000 XOF |
+| Approvisionnements de caisse | 141 |
+| Caisse minimale (agence, fin de journée) | 3 002 580 XOF |
+| Banque minimale (fin de journée) | 163 883 235 XOF |
 
 | Anomalie | Table | Lignes | Traitement attendu |
 |---|---|---:|---|
-| DOUBLON_EXACT | operations | 663 (1 001 copies) | DEDOUBLONNER |
-| ORPHELIN_COMPTE | operations | 663 | REJETER |
-| MONTANT_NEGATIF | operations | 663 | REJETER |
-| FORMAT_CANAL | operations | 663 | STANDARDISER |
+| DOUBLON_EXACT | operations | 665 (1 004 copies) | DEDOUBLONNER |
+| ORPHELIN_COMPTE | operations | 665 | REJETER |
+| MONTANT_NEGATIF | operations | 665 | REJETER |
+| FORMAT_CANAL | operations | 665 | STANDARDISER |
 | CANAL_NON_AUTORISE | charges | 2 | REJETER |
-| DATE_INCOHERENTE | remboursements | 74 | REJETER |
-| MONTANT_PAYE_INCOHERENT | remboursements | 74 | REJETER |
+| DATE_INCOHERENTE | remboursements | 117 | REJETER |
+| MONTANT_PAYE_INCOHERENT | remboursements | 117 | REJETER |
 | NULL_NON_CRITIQUE | clients | 20 | ACCEPTER_NULL |
 
 ## Ingestion bronze
@@ -174,23 +180,23 @@ make reset-bronze                          # vide le schéma bronze (imf_dwh uni
 ```
 
 **Rattrapage complet de l'exercice par défaut** (`make reset-bronze && make ingest-all`, mesuré
-sur une vraie exécution) : 365 runs en **28,4 s**, 4 380 lignes de journal. Chaque table bronze
+sur une vraie exécution) : 365 runs en **26,8 s**, 4 380 lignes de journal. Chaque table bronze
 a exactement le volume brut du manifeste :
 
 | Table bronze | Lignes |
 |---|---:|
-| `csv_operations` | 68 609 |
+| `csv_operations` | 68 848 |
 | `csv_charges` | 229 |
-| `csv_appro_caisse` | 152 |
+| `csv_appro_caisse` | 141 |
 | `csv_agences` | 6 |
 | `csv_ouverture` | 6 |
-| `meta_catalogue_anomalies` | 2 822 |
+| `meta_catalogue_anomalies` | 2 916 |
 | `ops_produits_credit` | 4 |
 | `ops_clients` | 2 000 |
 | `ops_comptes` | 2 317 |
 | `ops_credits` | 3 000 |
-| `ops_echeancier` | 34 352 |
-| `ops_remboursements` | 7 513 |
+| `ops_echeancier` | 34 037 |
+| `ops_remboursements` | 11 918 |
 
 ## Structure actuelle
 

@@ -12,7 +12,7 @@ from generator import config as cfg
 from generator.__main__ import Generation, generer
 from generator.echeancier import LigneEcheance, arrondi, teg_actuariel
 from generator.referentiels import SIEGE
-from generator.simulation import calculer_par30, est_ouvre
+from generator.simulation import calculer_par30, est_ouvre, quotas_mensuels
 from generator.tests.conftest import SEEDS, lire_csv, petite_config
 
 
@@ -391,3 +391,28 @@ def test_parents_visibles_avant_leurs_enfants(petite_generation: Generation) -> 
     # Aucune ligne hors de l'exercice n'a échappé au contrôle.
     for table in liens:
         assert all(config.debut <= j <= config.fin for j in par_jour[table])
+
+
+def test_quotas_mensuels() -> None:
+    """Quotas : somme exacte, rien en janvier, produits saisonniers dans leur saison."""
+    for nb in (150, 3000, 3001):
+        quotas = quotas_mensuels(nb)
+        assert sum(quotas.values()) == nb
+        assert all(n == 0 for (mois, _), n in quotas.items() if mois == 1)
+    quotas = quotas_mensuels(3000)
+    assert {m for (m, p) in quotas if p == "AGRICOLE"} == {5, 6, 7}
+    assert {m for (m, p) in quotas if p == "SCOLAIRE"} == {8, 9, 10}
+    # Croissance régulière : le quota d'un produit annuel ne décroît jamais d'un mois à l'autre.
+    agr = [quotas[m, "AGR"] for m in range(2, 13)]
+    assert agr == sorted(agr)
+
+
+def test_decaissements_jours_ouvres_et_mensuels(petite_generation: Generation) -> None:
+    """Décaissements les jours ouvrés, dans le mois de leur quota (aucun report)."""
+    v = petite_generation.verite
+    assert all(est_ouvre(c.date_decaissement) for c in v.credits)
+    produits = {p.code: p for p in cfg.PRODUITS}
+    for c in v.credits:
+        saison = produits[c.code_produit].mois_decaissement
+        if saison is not None:
+            assert saison[0] <= c.date_decaissement.month <= saison[1]

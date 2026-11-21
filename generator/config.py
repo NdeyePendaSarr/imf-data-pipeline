@@ -109,8 +109,8 @@ class ParametresProduit:
     mois_decaissement: tuple[int, int] | None
     montant_min: int
     montant_max: int
-    # Poids du produit dans le tirage des crédits
-    poids: float
+    # Part du produit dans le nombre annuel de crédits (somme des parts = 1)
+    part_annuelle: float
 
 
 PRODUITS: tuple[ParametresProduit, ...] = (
@@ -124,7 +124,7 @@ PRODUITS: tuple[ParametresProduit, ...] = (
         None,
         100_000,
         1_500_000,
-        0.50,
+        0.465,
     ),
     ParametresProduit(
         "AGRICOLE",
@@ -160,7 +160,7 @@ PRODUITS: tuple[ParametresProduit, ...] = (
         None,
         300_000,
         3_000_000,
-        0.25,
+        0.285,
     ),
 )
 
@@ -172,8 +172,28 @@ DELAI_MIN_CREDIT_JOURS = 30
 MAX_CREDITS_ACTIFS = 2
 # Écart toléré entre le nombre de crédits demandé et obtenu.
 TOLERANCE_NB_CREDITS = 0.05
-# Nombre de tirages autorisés par crédit demandé avant d'abandonner.
+# Nombre de tirages autorisés par crédit d'un quota mensuel avant d'y renoncer (jamais reporté
+# sur un autre mois : aucun rattrapage de fin d'année).
 MAX_TENTATIVES_PAR_CREDIT = 50
+
+# Courbe mensuelle des décaissements : croissance régulière sur l'année. Chaque produit répartit
+# sa part annuelle sur ses mois de décaissement au prorata de cette courbe (saisonnalité :
+# AGRICOLE mai–juillet, SCOLAIRE août–octobre). Janvier vaut 0 : les premières adhésions datent
+# du 01/01 et un crédit exige 30 jours d'ancienneté du compte.
+CROISSANCE_MENSUELLE: dict[int, int] = {
+    1: 0,
+    2: 4,
+    3: 5,
+    4: 6,
+    5: 7,
+    6: 8,
+    7: 9,
+    8: 10,
+    9: 11,
+    10: 12,
+    11: 13,
+    12: 14,
+}
 # Plafond réglementaire du TEG (usure).
 TEG_MAX = Decimal("0.24")
 

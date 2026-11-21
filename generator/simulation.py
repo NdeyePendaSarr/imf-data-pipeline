@@ -6,6 +6,7 @@ agences → clients et comptes → crédits (échéancier, paiements) → profil
 → opérations et canaux des remboursements → charges → caisses (D18) → banque (D19).
 """
 
+import bisect
 import random
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
@@ -499,12 +500,25 @@ def _compatible(existants: Sequence[_Pret], nouveau: _Pret) -> bool:
     )
 
 
-def _fenetre(produit: ParametresProduit, annee: int) -> tuple[date, date]:
-    """Période de décaissement autorisée du produit sur l'exercice."""
-    if produit.mois_decaissement is None:
-        return date(annee, 1, 1), date(annee, 12, 31)
-    premier, dernier = produit.mois_decaissement
-    return date(annee, premier, 1), ajouter_mois(date(annee, dernier, 1), 1) - UN_JOUR
+def quotas_mensuels(nb_credits: int) -> dict[tuple[int, str], int]:
+    """Nombre de crédits à décaisser par (mois, produit), somme exactement égale à nb_credits.
+
+    Part annuelle du produit × courbe du mois / courbe cumulée sur ses mois de décaissement ;
+    arrondi par la méthode des plus forts restes (déterministe).
+    """
+    exacts: dict[tuple[int, str], Fraction] = {}
+    for produit in cfg.PRODUITS:
+        premier, dernier = produit.mois_decaissement or (1, 12)
+        mois = range(premier, dernier + 1)
+        total = sum(cfg.CROISSANCE_MENSUELLE[m] for m in mois)
+        part = Fraction(produit.part_annuelle).limit_denominator(10_000)
+        for m in mois:
+            exacts[m, produit.code] = nb_credits * part * cfg.CROISSANCE_MENSUELLE[m] / total
+    quotas = {cle: int(valeur) for cle, valeur in exacts.items()}
+    restes = sorted(exacts, key=lambda cle: (-(exacts[cle] - quotas[cle]), cle))
+    for cle in restes[: nb_credits - sum(quotas.values())]:
+        quotas[cle] += 1
+    return quotas
 
 
 def _attribuer_credits(
@@ -514,59 +528,66 @@ def _attribuer_credits(
     clients: Sequence[Client],
     epargne_par_client: dict[str, Compte],
 ) -> list[_Pret]:
-    """Tire les crédits un par un, en respectant les contraintes d'octroi."""
+    """Décaisse, mois par mois, le quota de chaque produit sous les contraintes d'octroi (G10).
+
+    Pour chaque crédit : un jour ouvré du mois tiré uniformément (pas de report du dimanche au
+    lundi), puis un client éligible ce jour-là (compte ouvert depuis 30 jours), compatible avec
+    ses crédits actifs. Un crédit non placé après MAX_TENTATIVES_PAR_CREDIT tirages est
+    abandonné, jamais reporté sur un mois suivant.
+    """
     prets: list[_Pret] = []
     par_client: dict[str, list[_Pret]] = defaultdict(list)
-    poids_produits = [p.poids for p in cfg.PRODUITS]
-    tentatives = 0
-    while (
-        len(prets) < config.nb_credits
-        and tentatives < cfg.MAX_TENTATIVES_PAR_CREDIT * config.nb_credits
-    ):
-        tentatives += 1
-        produit = rng.choices(cfg.PRODUITS, weights=poids_produits)[0]
-        client = rng.choice(clients)
-        compte = epargne_par_client[client.id_client]
-        debut_fenetre, fin_fenetre = _fenetre(produit, config.exercice)
-        debut_min = max(
-            compte.date_ouverture + timedelta(days=cfg.DELAI_MIN_CREDIT_JOURS), debut_fenetre
-        )
-        fin_max = min(fin_fenetre, config.fin)
-        if debut_min > fin_max:
-            continue
-        jour = jour_ouvre_suivant(
-            debut_min + timedelta(days=rng.randint(0, (fin_max - debut_min).days))
-        )
-        if jour > fin_max:
-            continue
-        montant = tirer_pas(rng, (produit.montant_min, produit.montant_max), cfg.PAS_MONTANT_CREDIT)
-        duree = rng.randint(produit.duree_min_mois, produit.duree_max_mois)
-        profil = tirer_cle(rng, cfg.POIDS_PROFILS_SAINS)
-        echeances = calculer_echeancier(montant, produit.taux_annuel, duree, jour)
-        etat = simuler_paiements(rng, echeances, profil, jour, config.fin)
-        pret = _Pret(
-            id_credit="",
-            client=client,
-            id_compte_epargne=compte.id_compte,
-            produit=produit,
-            debut=jour,
-            montant=montant,
-            frais=arrondi(produit.taux_frais_dossier * montant),
-            echeances=echeances,
-            profil=profil,
-            etat=etat,
-        )
-        if not _compatible(par_client[client.id_client], pret):
-            continue
-        pret = replace(pret, id_credit=ids.nouveau("CRD"))
-        prets.append(pret)
-        par_client[client.id_client].append(pret)
+    delai = timedelta(days=cfg.DELAI_MIN_CREDIT_JOURS)
+    # Clients triés par date d'éligibilité : les éligibles d'un jour forment un préfixe.
+    ordonnes = sorted(
+        clients, key=lambda c: (epargne_par_client[c.id_client].date_ouverture, c.id_client)
+    )
+    eligibilite = [epargne_par_client[c.id_client].date_ouverture + delai for c in ordonnes]
+    produits = {p.code: p for p in cfg.PRODUITS}
+
+    for (mois, code), quota in sorted(quotas_mensuels(config.nb_credits).items()):
+        produit = produits[code]
+        premier = date(config.exercice, mois, 1)
+        jours_ouvres = [
+            j for j in jours(premier, ajouter_mois(premier, 1) - UN_JOUR) if est_ouvre(j)
+        ]
+        for _ in range(quota):
+            for _ in range(cfg.MAX_TENTATIVES_PAR_CREDIT):
+                jour = rng.choice(jours_ouvres)
+                nb_eligibles = bisect.bisect_right(eligibilite, jour)
+                if nb_eligibles == 0:
+                    continue
+                client = ordonnes[rng.randrange(nb_eligibles)]
+                montant = tirer_pas(
+                    rng, (produit.montant_min, produit.montant_max), cfg.PAS_MONTANT_CREDIT
+                )
+                duree = rng.randint(produit.duree_min_mois, produit.duree_max_mois)
+                profil = tirer_cle(rng, cfg.POIDS_PROFILS_SAINS)
+                echeances = calculer_echeancier(montant, produit.taux_annuel, duree, jour)
+                pret = _Pret(
+                    id_credit="",
+                    client=client,
+                    id_compte_epargne=epargne_par_client[client.id_client].id_compte,
+                    produit=produit,
+                    debut=jour,
+                    montant=montant,
+                    frais=arrondi(produit.taux_frais_dossier * montant),
+                    echeances=echeances,
+                    profil=profil,
+                    etat=simuler_paiements(rng, echeances, profil, jour, config.fin),
+                )
+                if _compatible(par_client[client.id_client], pret):
+                    pret = replace(pret, id_credit=ids.nouveau("CRD"))
+                    prets.append(pret)
+                    par_client[client.id_client].append(pret)
+                    break
 
     ecart = abs(len(prets) - config.nb_credits)
     if ecart > cfg.TOLERANCE_NB_CREDITS * config.nb_credits:
         raise ValueError(
-            f"{len(prets)} crédits générés pour {config.nb_credits} demandés (écart > "
-            f"{cfg.TOLERANCE_NB_CREDITS:.0%}) : augmente --clients ou réduis --credits"
+            f"{len(prets)} crédits placés pour {config.nb_credits} demandés (écart > "
+            f"{cfg.TOLERANCE_NB_CREDITS:.0%}) sous les contraintes d'octroi : augmente --clients "
+            "ou réduis --credits"
         )
     return prets
 
