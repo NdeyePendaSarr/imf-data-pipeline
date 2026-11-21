@@ -4,7 +4,7 @@
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
 
-> 🚧 **Projet en construction** — phase 2 terminée, prochaine étape : ingestion bronze.
+> 🚧 **Projet en construction** — phase 3 en cours : ingestion bronze incrémentale et idempotente.
 
 ## Objectif
 
@@ -64,6 +64,7 @@ make install           # environnement Python
 make up                # démarre PostgreSQL
 make test              # tests rapides
 make generate          # génère data/ et remplit imf_ops
+make ingest-all        # ingère tout l'exercice dans bronze (imf_dwh)
 ```
 
 **Se connecter :**
@@ -100,8 +101,8 @@ aux sorties brutes redonne exactement la vérité : c'est le contrat du futur ne
 | Sortie | Contenu |
 |---|---|
 | `imf_ops` (PostgreSQL) | clients, comptes, produits_credit, credits, echeancier, remboursements |
-| `data/operations/date=AAAA-MM-JJ/` | dépôts, retraits et frais de tenue des agences, un fichier par jour |
-| `data/*.csv` | agences, charges, ouverture (capital, fonds de caisse), appro_caisse |
+| `data/<table>/date=AAAA-MM-JJ/` | operations (dépôts, retraits, frais de tenue), charges, appro_caisse : un fichier par jour avec des lignes |
+| `data/*.csv` | instantanés : agences, ouverture (capital, fonds de caisse), catalogue_anomalies |
 | `data/_verite/`, `data/_manifest.json` | vérité propre ; paramètres, volumes, indicateurs, SHA-256 |
 
 **Volumes et indicateurs de l'exécution par défaut** (relevés dans `data/_manifest.json`) :
@@ -139,12 +140,65 @@ aux sorties brutes redonne exactement la vérité : c'est le contrat du futur ne
 | MONTANT_PAYE_INCOHERENT | remboursements | 74 | REJETER |
 | NULL_NON_CRITIQUE | clients | 20 | ACCEPTER_NULL |
 
+## Ingestion bronze
+
+```
+imf_ops (PostgreSQL) ──COPY TO, fenêtre ]filigrane, J+1 00:00[──► data/landing/imf_ops/<table>/date=J/
+data/<table>/date=J/ (CSV des agences) ─────────────────────────────┐            │
+data/*.csv (instantanés) ───────────────────────────────────────────┤            │
+                                                                    ▼            ▼
+                                          même chargeur COPY ──► imf_dwh.bronze (+ _filigranes, _ingestions)
+```
+
+Chaque jour J est ingéré dans **une seule transaction** (données, filigranes et journal) : une
+erreur annule tout le jour et la commande sort en erreur. Le rattrapage boucle jour par jour avec
+le même code.
+
+| Table bronze | Source | Mode |
+|---|---|---|
+| `csv_operations`, `csv_charges`, `csv_appro_caisse` | CSV des agences | partition du jour : ignorée si le même SHA-256 est déjà chargé, remplacée sinon ; aucun dédoublonnage |
+| `csv_agences`, `csv_ouverture` | CSV des agences | instantané : rechargé en entier si son SHA-256 change |
+| `meta_catalogue_anomalies` | métadonnée de test | instantané |
+| `ops_produits_credit`, `ops_clients`, `ops_comptes`, `ops_credits`, `ops_echeancier`, `ops_remboursements` | imf_ops | filigrane sur `date_maj` ; une ligne par version, `UNIQUE (clé, date_maj)` |
+| `_filigranes`, `_ingestions` | — | pilotage : filigrane par table, journal par run et par objet (CHARGE, IGNORE, VIDE) |
+
+Chaque ligne porte `_id_run` (`AAAA-MM-JJ#n`), `_source`, `_num_ligne`, `_sha256` et
+`_charge_le`. Le bronze est lié à une génération : une autre génération de `data/` est refusée
+(`make reset-bronze`).
+
+```bash
+make ingest DATE=2025-03-15                # un jour
+make ingest-range DU=2025-01-01 AU=2025-06-30
+make ingest-all                            # tout l'exercice, jour par jour
+make reset-bronze                          # vide le schéma bronze (imf_dwh uniquement)
+```
+
+**Rattrapage complet de l'exercice par défaut** (`make reset-bronze && make ingest-all`, mesuré
+sur une vraie exécution) : 365 runs en **28,4 s**, 4 380 lignes de journal. Chaque table bronze
+a exactement le volume brut du manifeste :
+
+| Table bronze | Lignes |
+|---|---:|
+| `csv_operations` | 68 609 |
+| `csv_charges` | 229 |
+| `csv_appro_caisse` | 152 |
+| `csv_agences` | 6 |
+| `csv_ouverture` | 6 |
+| `meta_catalogue_anomalies` | 2 822 |
+| `ops_produits_credit` | 4 |
+| `ops_clients` | 2 000 |
+| `ops_comptes` | 2 317 |
+| `ops_credits` | 3 000 |
+| `ops_echeancier` | 34 352 |
+| `ops_remboursements` | 7 513 |
+
 ## Structure actuelle
 
 ```
 ├── docker/postgres/init/   # création des bases et des schémas
 ├── dbt/seeds/              # plan de comptes et règles de mapping comptable
 ├── generator/              # générateur de données (vérité, anomalies, imf_ops) et ses tests
+├── ingestion/              # ingestion bronze (fenêtres, extraction, chargement, journal) et ses tests
 ├── data/                   # sorties du générateur (non versionnées)
 ├── tests/                  # tests du socle
 ├── docker-compose.yml
@@ -164,6 +218,10 @@ aux sorties brutes redonne exactement la vérité : c'est le contrat du futur ne
 - Jours ouvrés du lundi au samedi, sans jours fériés.
 - Pas de refinancement : le capital d'ouverture couvre seul le besoin de financement, d'où un
   capital élevé.
+- Runs imf_ops cumulatifs (filigrane) : rejouer un jour passé ne recharge rien ; pour tout rejouer,
+  make reset-bronze.
+- La base opérationnelle simulée ne conserve que l'état au 31/12 : le statut des crédits n'est pas
+  historisé.
 
 ## Licence
 
