@@ -1,0 +1,7 @@
+# Fins de ligne LF pour tous les fichiers texte
+* text=auto eol=lf
+
+# Fichiers binaires
+*.pbix binary
+*.png binary
+*.jpg binary

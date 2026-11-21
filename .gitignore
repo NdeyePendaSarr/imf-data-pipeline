@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environnement virtuel
+.venv/
+
+# Secrets locaux
+.env
+
+# Données générées
+data/
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+
+# Caches des outils
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Couverture de tests
+.coverage
+.coverage.*
+htmlcov/
