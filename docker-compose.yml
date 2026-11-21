@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: imf-postgres
+    restart: unless-stopped
+    environment:
+      # Identifiants lus depuis le fichier .env (jamais versionné)
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+      # Base créée automatiquement : l'entrepôt
+      POSTGRES_DB: imf_dwh
+    ports:
+      # 5433 par défaut : le port 5432 est déjà pris par un PostgreSQL local
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Scripts exécutés au premier démarrage uniquement (volume vide)
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d imf_dwh"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  pgdata:
