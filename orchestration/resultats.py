@@ -3,7 +3,7 @@
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 # Statuts d'une étape (colonne audit.audit_runs.statut).
@@ -29,7 +29,13 @@ CODES = {
 VOLUME_RATIO_MIN = 0.5
 VOLUME_RATIO_MAX = 2.0
 VOLUME_SEMAINES_REFERENCE = 4
+# Jours ordinaires servant au facteur de tendance : 7 pour un jour ordinaire, 28 pour une fin
+# de mois (croissance du mois écoulé).
+VOLUME_JOURS_TENDANCE = 7
+VOLUME_JOURS_TENDANCE_FIN_DE_MOIS = 28
 DIMANCHE = 7
+# Jours ouvrés du guichet et des agents : lundi à samedi, sans jours fériés (cadrage, I1).
+JOURS_OUVRES = frozenset({1, 2, 3, 4, 5, 6})
 
 # Messages dbt d'une base injoignable : un nœud en erreur pour cette raison est une panne
 # technique (relançable), pas un échec de contrôle.
@@ -132,17 +138,83 @@ def evaluer_run_results(jour: date, code_dbt: int, run_results: Mapping[str, Any
     )
 
 
-def evaluer_volume(
-    jour: date,
-    nb_jour: int,
-    historique: Mapping[date, int | None],
-) -> Resume:
+def est_dernier_jour_ouvre(jour: date) -> bool:
+    """Vrai pour le dernier jour ouvré (lundi à samedi) de son mois."""
+    if jour.isoweekday() not in JOURS_OUVRES:
+        return False
+    suivant = jour + timedelta(days=1)
+    while suivant.isoweekday() not in JOURS_OUVRES:
+        suivant += timedelta(days=1)
+    return suivant.month != jour.month
+
+
+class _HistoriqueIncomplet(Exception):
+    """Un jour nécessaire au calcul n'a pas été ingéré."""
+
+
+def _volume(volumes: Mapping[date, int | None], jour: date) -> int:
+    valeur = volumes.get(jour)
+    if valeur is None:
+        raise _HistoriqueIncomplet(jour.isoformat())
+    return valeur
+
+
+def _ordinaires(volumes: Mapping[date, int | None], fin: date, nb_jours: int) -> float:
+    """Opérations par jour ordinaire sur les nb_jours précédant `fin` (exclu), derniers jours
+    ouvrés du mois exclus. Une moyenne et non une somme : une fenêtre qui contient une fin de
+    mois compte un jour de moins, sans biaiser le facteur de tendance."""
+    jours = [fin - timedelta(days=i) for i in range(1, nb_jours + 1)]
+    valeurs = [_volume(volumes, j) for j in jours if not est_dernier_jour_ouvre(j)]
+    return sum(valeurs) / len(valeurs)
+
+
+def _reference_ordinaire(volumes: Mapping[date, int | None], jour: date) -> tuple[float, float]:
+    """Moyenne des 4 mêmes jours de semaine précédents, fins de mois exclues, et facteur de
+    tendance : 7 derniers jours ordinaires / moyenne des mêmes 7 jours décalés de 1 à 4 semaines."""
+    references: list[int] = []
+    candidat = jour
+    while len(references) < VOLUME_SEMAINES_REFERENCE:
+        candidat -= timedelta(days=7)
+        if candidat.year != jour.year:
+            raise _HistoriqueIncomplet("moins de 4 semaines dans l'exercice")
+        if not est_dernier_jour_ouvre(candidat):
+            references.append(_volume(volumes, candidat))
+    recent = _ordinaires(volumes, jour, VOLUME_JOURS_TENDANCE)
+    semaines = [
+        _ordinaires(volumes, jour - timedelta(days=7 * k), VOLUME_JOURS_TENDANCE)
+        for k in range(1, VOLUME_SEMAINES_REFERENCE + 1)
+    ]
+    base = sum(semaines) / len(semaines)
+    return sum(references) / len(references), (recent / base if base else 1.0)
+
+
+def _reference_fin_de_mois(volumes: Mapping[date, int | None], jour: date) -> tuple[float, float]:
+    """Fin de mois précédente et facteur de tendance : 28 derniers jours ordinaires / les 28
+    jours ordinaires avant la fin de mois précédente."""
+    candidat = jour.replace(day=1) - timedelta(days=1)
+    while not est_dernier_jour_ouvre(candidat):
+        candidat -= timedelta(days=1)
+    if candidat.year != jour.year:
+        raise _HistoriqueIncomplet("aucune fin de mois précédente dans l'exercice")
+    precedente = _volume(volumes, candidat)
+    recent = _ordinaires(volumes, jour, VOLUME_JOURS_TENDANCE_FIN_DE_MOIS)
+    base = _ordinaires(volumes, candidat, VOLUME_JOURS_TENDANCE_FIN_DE_MOIS)
+    return float(precedente), (recent / base if base else 1.0)
+
+
+def evaluer_volume(jour: date, volumes: Mapping[date, int | None]) -> Resume:
     """Contrôle de volume des opérations du jour (avertissement seulement, jamais bloquant).
 
-    `historique` : les 4 mêmes jours de semaine précédents (J−7 à J−28), avec None pour un jour
-    non ingéré. Moins de 4 semaines d'historique : pas de contrôle. Un dimanche à 0 est normal.
-    Hors de [50 % ; 200 %] de la moyenne de référence : AVERTISSEMENT.
+    `volumes` : opérations par jour de l'exercice jusqu'à J inclus (None ou absent = jour non
+    ingéré). La référence suit la croissance du portefeuille :
+    - jour ordinaire : moyenne des 4 mêmes jours de semaine précédents (fins de mois exclues)
+      × facteur de tendance sur 7 jours ;
+    - dernier jour ouvré du mois : fin de mois précédente × facteur de tendance sur 28 jours.
+    Hors de [50 % ; 200 %] de la référence : AVERTISSEMENT. Historique insuffisant (moins de
+    4 semaines, aucune fin de mois précédente, jour non ingéré) : pas de contrôle. Un dimanche
+    à 0 est normal.
     """
+    nb_jour = volumes.get(jour) or 0
 
     def resume(statut: str, message: str, details: dict[str, Any] | None = None) -> Resume:
         return Resume(
@@ -152,18 +224,30 @@ def evaluer_volume(
 
     if jour.isoweekday() == DIMANCHE and nb_jour == 0:
         return resume(SUCCES, "dimanche sans opération : normal")
-    valeurs = [historique.get(jour.fromordinal(jour.toordinal() - 7 * k)) for k in range(1, 5)]
-    if len(historique) < VOLUME_SEMAINES_REFERENCE or any(v is None for v in valeurs):
-        return resume(SUCCES, "historique de moins de 4 semaines : pas de contrôle")
-    moyenne = sum(v for v in valeurs if v is not None) / VOLUME_SEMAINES_REFERENCE
-    ratio = (nb_jour / moyenne) if moyenne else (float("inf") if nb_jour else 1.0)
-    details = {"moyenne_reference": round(moyenne, 2), "ratio": round(ratio, 4)}
+    fin_de_mois = est_dernier_jour_ouvre(jour)
+    try:
+        if fin_de_mois:
+            base, facteur = _reference_fin_de_mois(volumes, jour)
+        else:
+            base, facteur = _reference_ordinaire(volumes, jour)
+    except _HistoriqueIncomplet as manque:
+        return resume(SUCCES, f"historique insuffisant ({manque}) : pas de contrôle")
+    reference = base * facteur
+    ratio = (nb_jour / reference) if reference else (float("inf") if nb_jour else 1.0)
+    nature = "fin de mois" if fin_de_mois else "jour ordinaire"
+    details = {
+        "nature": nature,
+        "reference_brute": round(base, 2),
+        "facteur_tendance": round(facteur, 4),
+        "reference": round(reference, 2),
+        "ratio": round(ratio, 4),
+    }
     if VOLUME_RATIO_MIN <= ratio <= VOLUME_RATIO_MAX:
-        message = f"{nb_jour} opérations, {ratio:.0%} de la moyenne des 4 mêmes jours"
+        message = f"{nb_jour} opérations, {ratio:.0%} de la référence ({nature})"
         return resume(SUCCES, message, details)
     message = (
-        f"volume inhabituel : {nb_jour} opérations pour une moyenne de {moyenne:.1f} "
-        f"(hors de [50 % ; 200 %])"
+        f"volume inhabituel ({nature}) : {nb_jour} opérations pour une référence de "
+        f"{reference:.1f}, soit {ratio:.0%} (hors de [50 % ; 200 %])"
     )
     return resume(AVERTISSEMENT, message, details)
 

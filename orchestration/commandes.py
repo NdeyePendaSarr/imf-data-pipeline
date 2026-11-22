@@ -6,7 +6,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -146,32 +146,27 @@ def completude(jour: date, parametres: Parametres) -> Resume:
     return evaluer_completude(jour, attendu, charge, jour_ingere)
 
 
+def volumes_ingeres(conn: psycopg.Connection[Any], du: date, au: date) -> dict[date, int]:
+    """Opérations par jour ingéré entre du et au (0 pour un jour ingéré sans fichier)."""
+    ingeres = conn.execute(
+        "SELECT DISTINCT jour FROM bronze._ingestions WHERE jour BETWEEN %s AND %s", (du, au)
+    ).fetchall()
+    volumes: dict[date, int] = {ligne[0]: 0 for ligne in ingeres}
+    comptes = conn.execute(
+        "SELECT substring(_source from 'date=([0-9-]+)/')::date AS jour, count(*) "
+        "FROM bronze.csv_operations WHERE _source LIKE 'operations/date=%%' GROUP BY 1"
+    ).fetchall()
+    for jour_source, nombre in comptes:
+        if jour_source in volumes:
+            volumes[jour_source] = int(nombre)
+    return volumes
+
+
 def volume(jour: date, parametres: Parametres) -> Resume:
-    """Opérations du jour vs moyenne des 4 mêmes jours de semaine précédents (avertissement)."""
-
-    def source(d: date) -> str:
-        return f"operations/date={d.isoformat()}/operations.csv"
-
-    references = [jour - timedelta(days=7 * k) for k in range(1, 5)]
+    """Opérations du jour vs référence corrigée de la tendance (avertissement seulement)."""
     with _connexion(parametres) as conn:
-
-        def compter(d: date) -> int:
-            ligne = conn.execute(
-                "SELECT count(*) FROM bronze.csv_operations WHERE _source = %s", (source(d),)
-            ).fetchone()
-            return int(ligne[0]) if ligne else 0
-
-        ingeres = {
-            r[0]
-            for r in conn.execute(
-                "SELECT DISTINCT jour FROM bronze._ingestions WHERE jour = ANY(%s)", (references,)
-            ).fetchall()
-        }
-        historique: dict[date, int | None] = {
-            d: (compter(d) if d in ingeres else None) for d in references
-        }
-        nb_jour = compter(jour)
-    return evaluer_volume(jour, nb_jour, historique)
+        volumes = volumes_ingeres(conn, date(jour.year, 1, 1), jour)
+    return evaluer_volume(jour, dict(volumes))
 
 
 def dbt(jour: date, parametres: Parametres) -> Resume:

@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
 	ingest ingest-range ingest-all reset-bronze \
-	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs airflow-reprendre test-airflow \
+	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes test-airflow \
 	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
@@ -86,6 +86,14 @@ airflow-logs: ## Suit les journaux des services Airflow
 airflow-reprendre: ## Reprend un jour en échec : make airflow-reprendre JOUR=AAAA-MM-JJ [ETAPE=…]
 	@test -n "$(JOUR)" || { echo "Usage : make airflow-reprendre JOUR=AAAA-MM-JJ [ETAPE=ingerer]"; exit 2; }
 	$(AIRFLOW) exec -T airflow-scheduler python airflow/reprendre.py $(JOUR) $(ETAPE)
+
+empreinte-gold: ## MD5 des 19 tables gold dans un fichier : make empreinte-gold FICHIER=…
+	@test -n "$(FICHIER)" || { echo "Usage : make empreinte-gold FICHIER=chemin"; exit 2; }
+	uv run python -m orchestration.empreinte calculer $(FICHIER)
+
+compare-empreintes: ## Compare deux empreintes gold (échec si différentes) : A=… B=…
+	@test -n "$(A)" -a -n "$(B)" || { echo "Usage : make compare-empreintes A=… B=…"; exit 2; }
+	uv run python -m orchestration.empreinte comparer $(A) $(B)
 
 test-airflow: ## Tests d'intégrité des DAG, dans le conteneur Airflow
 	$(AIRFLOW) exec -T airflow-scheduler python -m pytest -q -p no:cacheprovider airflow/tests

@@ -18,6 +18,7 @@ from orchestration.resultats import (
     NON_EXECUTE,
     SUCCES,
     Resume,
+    est_dernier_jour_ouvre,
     evaluer_completude,
     evaluer_run_results,
     evaluer_volume,
@@ -92,34 +93,109 @@ def test_run_results_avertissement() -> None:
 # --- volume ----------------------------------------------------------------------------------
 
 
-def historique(valeurs: list[int | None], jour: date = JOUR) -> dict[date, int | None]:
-    """Historique des 4 mêmes jours de semaine précédents (J−7, J−14, J−21, J−28)."""
-    return {jour - timedelta(days=7 * k): v for k, v in enumerate(valeurs, start=1)}
+EXERCICE = [date(2025, 1, 1) + timedelta(days=i) for i in range(365)]
+MARDI_JUIN = date(2025, 6, 10)
+FIN_SEPTEMBRE = date(2025, 9, 30)  # dernier jour ouvré de septembre (un mardi)
+
+
+def serie_lineaire() -> dict[date, int | None]:
+    """Portefeuille en croissance linéaire régulière, comme le générateur : jours ouvrés
+    20 + t opérations, dimanches au cinquième, fins de mois au quintuple."""
+    volumes: dict[date, int | None] = {}
+    for t, jour in enumerate(EXERCICE):
+        base = 20 + t
+        if jour.isoweekday() == 7:
+            base //= 5
+        elif est_dernier_jour_ouvre(jour):
+            base *= 5
+        volumes[jour] = base
+    return volumes
+
+
+def serie_plate(valeur: int = 100) -> dict[date, int | None]:
+    return dict.fromkeys(EXERCICE, valeur)
+
+
+def avertissements(volumes: dict[date, int | None]) -> list[date]:
+    return [j for j in EXERCICE if evaluer_volume(j, volumes).statut == AVERTISSEMENT]
+
+
+def test_derniers_jours_ouvres() -> None:
+    assert est_dernier_jour_ouvre(date(2025, 1, 31))  # vendredi
+    assert est_dernier_jour_ouvre(date(2025, 5, 31))  # samedi
+    assert est_dernier_jour_ouvre(date(2025, 11, 29))  # samedi, le 30 est un dimanche
+    assert not est_dernier_jour_ouvre(date(2025, 11, 30))
+    assert not est_dernier_jour_ouvre(date(2025, 1, 30))
+
+
+def test_volume_croissance_lineaire_sans_alerte() -> None:
+    """Croissance régulière du portefeuille, fins de mois comprises : aucune alerte."""
+    assert avertissements(serie_lineaire()) == []
+
+
+def test_volume_chute_jour_ordinaire() -> None:
+    volumes = serie_lineaire()
+    volumes[MARDI_JUIN] = int((volumes[MARDI_JUIN] or 0) * 0.4)  # −60 %
+    resume = evaluer_volume(MARDI_JUIN, volumes)
+    assert (resume.statut, resume.code) == (AVERTISSEMENT, CODE_SUCCES)
+    assert resume.details["nature"] == "jour ordinaire"
+    assert resume.details["ratio"] < 0.5
+    assert avertissements(volumes)[0] == MARDI_JUIN
+
+
+def test_volume_pic_jour_ordinaire() -> None:
+    volumes = serie_lineaire()
+    volumes[MARDI_JUIN] = (volumes[MARDI_JUIN] or 0) * 3
+    resume = evaluer_volume(MARDI_JUIN, volumes)
+    assert (resume.statut, resume.code) == (AVERTISSEMENT, CODE_SUCCES)
+    assert resume.details["ratio"] > 2.0
+
+
+def test_volume_chute_fin_de_mois() -> None:
+    volumes = serie_lineaire()
+    volumes[FIN_SEPTEMBRE] = int((volumes[FIN_SEPTEMBRE] or 0) * 0.4)
+    resume = evaluer_volume(FIN_SEPTEMBRE, volumes)
+    assert (resume.statut, resume.code) == (AVERTISSEMENT, CODE_SUCCES)
+    assert resume.details["nature"] == "fin de mois"
+    assert resume.details["ratio"] < 0.5
 
 
 def test_volume_dimanche_a_zero_normal() -> None:
     dimanche = date(2025, 3, 16)
-    resume = evaluer_volume(dimanche, 0, historique([40, 50, 45, 55], dimanche))
+    volumes = serie_lineaire()
+    volumes[dimanche] = 0
+    resume = evaluer_volume(dimanche, volumes)
     assert (resume.statut, resume.code) == (SUCCES, CODE_SUCCES)
     assert "dimanche" in resume.message
 
 
-def test_volume_historique_insuffisant() -> None:
-    """Moins de 4 semaines d'historique ingéré : pas de contrôle."""
-    resume = evaluer_volume(JOUR, 1000, historique([100, 100, None, None]))
+@pytest.mark.parametrize(
+    "jour",
+    [date(2025, 1, 20), date(2025, 1, 31), JOUR],
+    ids=["moins_de_4_semaines", "premiere_fin_de_mois", "jour_non_ingere"],
+)
+def test_volume_historique_insuffisant(jour: date) -> None:
+    """Moins de 4 semaines, aucune fin de mois précédente ou jour manquant : pas de contrôle."""
+    volumes = serie_lineaire()
+    volumes[JOUR - timedelta(days=3)] = None
+    volumes[jour] = 10_000
+    resume = evaluer_volume(jour, volumes)
     assert resume.statut == SUCCES and "pas de contrôle" in resume.message
 
 
 @pytest.mark.parametrize(
     ("nb", "statut"),
     [(100, SUCCES), (50, SUCCES), (200, SUCCES), (49, AVERTISSEMENT), (201, AVERTISSEMENT)],
-    ids=["moyenne", "borne_50", "borne_200", "sous_50", "au_dela_200"],
+    ids=["reference", "borne_50", "borne_200", "sous_50", "au_dela_200"],
 )
-def test_volume_plage(nb: int, statut: str) -> None:
-    """Plage [50 % ; 200 %] de la moyenne ; hors plage : avertissement, sortie 0."""
-    resume = evaluer_volume(JOUR, nb, historique([80, 120, 90, 110]))
+@pytest.mark.parametrize("jour", [JOUR, date(2025, 3, 31)], ids=["ordinaire", "fin_de_mois"])
+def test_volume_plage(jour: date, nb: int, statut: str) -> None:
+    """Série plate : référence 100, facteur 1 ; hors de [50 % ; 200 %] : avertissement, sortie 0."""
+    volumes = serie_plate()
+    volumes[jour] = nb
+    resume = evaluer_volume(jour, volumes)
     assert (resume.statut, resume.code) == (statut, CODE_SUCCES)
-    assert resume.details["moyenne_reference"] == 100.0
+    assert (resume.details["reference"], resume.details["facteur_tendance"]) == (100.0, 1.0)
 
 
 # --- complétude ------------------------------------------------------------------------------

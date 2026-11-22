@@ -145,7 +145,8 @@ services:
     <<: *airflow-commun
     container_name: imf-airflow-scheduler
     command: scheduler
-    mem_limit: 1g
+    # Pic mesuré : 685 Mio sur le backfill du trimestre (67 % de 1 Gio) ; marge pour l'année.
+    mem_limit: 1536m
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]

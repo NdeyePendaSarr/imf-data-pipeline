@@ -374,8 +374,28 @@ de sa sortie est un résumé JSON ; le code de sortie fixe la suite :
 |---|---|
 | `attendre` | capteur (mode reschedule, 60 s, 1 h) : fichiers du jour déclarés par le manifeste |
 | `completude` | lignes en bronze = `lignes_fichiers` du manifeste (CSV) et = lignes de landing (imf_ops) |
-| `volume` | opérations du jour / moyenne des 4 mêmes jours de semaine précédents, hors de [50 % ; 200 %] → avertissement ; pas de contrôle avant 4 semaines d'historique ; dimanche à 0 normal |
+| `volume` | opérations du jour / référence corrigée de la tendance (ci-dessous), hors de [50 % ; 200 %] → avertissement, jamais bloquant |
 | `dbt` | `dbt build --vars '{date_arrete: J}'`, puis lecture de `run_results.json` : nœud en error, fail ou skipped → code 3 |
+
+**Contrôle de volume.** Le volume du jour est comparé à ce qu'il était les jours comparables,
+corrigé de la croissance récente du portefeuille. Paramètres :
+- jour ordinaire : moyenne des 4 mêmes jours de semaine précédents (derniers jours ouvrés du
+  mois exclus), × facteur de tendance = opérations par jour ordinaire des 7 derniers jours /
+  moyenne de la même mesure décalée de 1 à 4 semaines ;
+- dernier jour ouvré du mois (lundi à samedi) : la fin de mois précédente, × facteur de
+  tendance sur 28 jours ordinaires (les 28 derniers / les 28 avant la fin de mois précédente) ;
+- plage acceptée [50 % ; 200 %] de la référence ; dimanche à 0 normal ; pas de contrôle sans
+  4 semaines d'historique ingéré ni, pour une fin de mois, sans fin de mois précédente dans
+  l'exercice.
+
+Rejouée sur 2025, la règle ne lève aucune alerte (ratios de 63 % à 198 %, extrêmes sur des
+dimanches à 9-20 opérations) ; un mardi de juin ou la fin septembre divisés par 3 tombent à
+34 % et alertent. L'ancienne règle (4 mêmes jours de semaine, sans tendance) levait 10 alertes
+sur le trimestre, toutes structurelles : croissance du portefeuille (≈ 190 comptes ouverts par
+mois, 27 opérations par jour en janvier, 387 en décembre) et vendredis de fin de mois dans la
+moyenne de référence. **Limite :** la règle détecte une rupture brutale, pas une dérive lente,
+puisque le facteur de tendance s'adapte en une semaine ; sur un dimanche, petit effectif, la
+marge vers 200 % est faible.
 
 Chaque tentative de chaque étape écrit une ligne dans `audit.audit_runs` (append-only, source
 dbt `audit`) : statut, durée, lignes chargées, compteurs dbt, nœuds en échec et sautés, version
@@ -395,9 +415,14 @@ make airflow-reprendre JOUR=2025-02-12 ETAPE=dbt_build  # seed ou modèle corrig
 make airflow-reprendre JOUR=2025-02-12                  # toutes les étapes
 ```
 
-La cible remet à zéro les tâches du jour à partir de l'étape (aval compris), puis repasse en file
-les runs suivants déjà démarrés : le scheduler reprend dans l'ordre des dates. Inutile pour une
-panne transitoire, que les retries absorbent.
+La cible remet à zéro les tâches du jour à partir de l'étape (aval compris), vérifie qu'elles
+l'ont bien été (sinon : erreur, rien d'autre n'est touché), puis repasse en file les runs
+suivants déjà démarrés : le scheduler reprend dans l'ordre des dates. Inutile pour une panne
+transitoire, que les retries absorbent.
+
+**Empreinte du gold.** `make empreinte-gold FICHIER=…` écrit le MD5 du contenu trié (toutes
+colonnes) de chacune des 19 tables gold ; elle échoue si le schéma n'a pas 19 tables ou si une
+table est vide. `make compare-empreintes A=… B=…` échoue si deux empreintes diffèrent.
 
 **Fichier source corrigé.** L'ingestion ne se fie pas au nom du fichier mais à son SHA-256 :
 même empreinte que la dernière chargée → `IGNORE` ; empreinte différente → la partition
@@ -457,8 +482,8 @@ SELECT tentative, statut, debut, fin, message FROM audit.audit_runs
 WHERE date_logique = '2025-03-10' AND etape = 'dbt_build' ORDER BY id_audit;
 ```
 
-Le contrôle de volume a levé dix avertissements sur le trimestre, attendus avec ces données (les
-trois fins de mois, à 219, 448 et 670 opérations pour une moyenne de 22 à 93) :
+L'ancienne règle de volume a levé dix avertissements sur le trimestre, tous structurels (voir
+« Contrôle de volume ») ; la règle actuelle n'en aurait levé aucun :
 
 ```sql
 SELECT date_logique, message FROM audit.audit_runs
