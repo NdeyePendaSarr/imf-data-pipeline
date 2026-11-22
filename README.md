@@ -348,9 +348,128 @@ make airflow-logs    # journaux
 make airflow-down    # arrêt (la base de métadonnées est conservée)
 ```
 
-Interface : http://localhost:8080 (compte `AIRFLOW_ADMIN_USER` du `.env`). Le DAG
-`imf_quotidien` n'a pour l'instant qu'une tâche, `verifier_environnement` (dbt debug, CLI
-d'ingestion, séparation des deux environnements), déclenchée à la main.
+Interface : http://localhost:8080 (compte `AIRFLOW_ADMIN_USER` du `.env`).
+
+### DAG `imf_quotidien`
+
+Un run par jour de l'exercice (`@daily`, du 01/01 au 31/12 de `IMF_EXERCICE`, sans catchup,
+un seul run actif, `depends_on_past`, 2 retries à délai exponentiel à partir de 2 min) :
+
+```
+verifier_environnement → attendre_fichiers → ingerer → controler_completude
+  → controler_volume → dbt_build → ecrire_audit (teardown)
+```
+
+Chaque tâche lance une commande du paquet `orchestration/` dans le venv du projet (Airflow n'y
+est jamais importé) : `python -m orchestration <commande> --date AAAA-MM-JJ`. La dernière ligne
+de sa sortie est un résumé JSON ; le code de sortie fixe la suite :
+
+| Code | Statut | Effet dans Airflow |
+|---|---|---|
+| 0 | `SUCCES` ou `AVERTISSEMENT` | tâche verte |
+| 3 | `ECHEC_CONTROLE` (donnée ou test faux) | échec immédiat, **sans retry** |
+| autre | `ECHEC_TECHNIQUE` (base injoignable, dbt code 2…) | retry |
+
+| Commande | Contrôle |
+|---|---|
+| `attendre` | capteur (mode reschedule, 60 s, 1 h) : fichiers du jour déclarés par le manifeste |
+| `completude` | lignes en bronze = `lignes_fichiers` du manifeste (CSV) et = lignes de landing (imf_ops) |
+| `volume` | opérations du jour / moyenne des 4 mêmes jours de semaine précédents, hors de [50 % ; 200 %] → avertissement ; pas de contrôle avant 4 semaines d'historique ; dimanche à 0 normal |
+| `dbt` | `dbt build --vars '{date_arrete: J}'`, puis lecture de `run_results.json` : nœud en error, fail ou skipped → code 3 |
+
+Chaque tentative de chaque étape écrit une ligne dans `audit.audit_runs` (append-only, source
+dbt `audit`) : statut, durée, lignes chargées, compteurs dbt, nœuds en échec et sautés, version
+du mapping, commit git. Le teardown `ecrire_audit` ajoute la ligne `etape = 'RUN'`, au statut
+global (`NON_EXECUTE` pour une étape sans résumé). Si la base est injoignable, la ligne attend
+dans `data/_audit_en_attente.jsonl` et est versée à l'écriture suivante.
+
+### Reprendre un jour en échec
+
+Avec `depends_on_past` et un seul run actif, un jour en échec bloque la suite : le run du
+lendemain démarre mais ses tâches attendent la veille, et occupe la seule place. Après avoir
+corrigé la cause :
+
+```bash
+make airflow-reprendre JOUR=2025-02-12 ETAPE=ingerer    # fichier source corrigé
+make airflow-reprendre JOUR=2025-02-12 ETAPE=dbt_build  # seed ou modèle corrigé
+make airflow-reprendre JOUR=2025-02-12                  # toutes les étapes
+```
+
+La cible remet à zéro les tâches du jour à partir de l'étape (aval compris), puis repasse en file
+les runs suivants déjà démarrés : le scheduler reprend dans l'ordre des dates. Inutile pour une
+panne transitoire, que les retries absorbent.
+
+**Fichier source corrigé.** L'ingestion ne se fie pas au nom du fichier mais à son SHA-256 :
+même empreinte que la dernière chargée → `IGNORE` ; empreinte différente → la partition
+(`_source`) est supprimée puis rechargée en entier, dans la même transaction. Procédure :
+1. remplacer le CSV par la version corrigée, au même chemin (son empreinte doit être celle du
+   manifeste, sinon `completude` échouera de nouveau) ;
+2. `make airflow-reprendre JOUR=… ETAPE=ingerer` ;
+3. vérifier que la partition ne contient qu'un run et le nombre de lignes du manifeste (requête
+   de la panne a ci-dessous).
+
+### Démonstration : backfill du 01/01 au 31/03 et trois pannes
+
+```bash
+make reset-bronze
+docker compose --profile airflow exec airflow-scheduler airflow backfill create \
+  --dag-id imf_quotidien --from-date 2025-01-01 --to-date 2025-03-31 \
+  --max-active-runs 1 --reprocess-behavior failed
+```
+
+(`--reprocess-behavior` est obligatoire dès qu'une tâche a `depends_on_past`.) Les 90 runs
+finissent verts. Le gold au 31/03 issu du backfill est identique, sur les 19 tables (MD5 du
+contenu trié), à un `dbt build --vars '{date_arrete: 2025-03-31}'` lancé à la main : bilan
+**1 866 378 469 XOF** (actif = passif), résultat cumulé **−114 897 159 XOF**.
+
+**a) Fichier incomplet** — une ligne retirée de `operations/date=2025-02-12/operations.csv`
+avant son ingestion : `controler_completude` passe au rouge (44 lignes en bronze, 45 au
+manifeste), sans retry ; le 13/02 ne dépasse pas `attendre_fichiers`. Fichier restauré, puis
+`make airflow-reprendre JOUR=2025-02-12 ETAPE=ingerer` : la partition est rechargée par
+empreinte (run `#2`, 45 lignes).
+
+```sql
+SELECT etape, tentative, statut, message FROM audit.audit_runs
+WHERE date_logique = '2025-02-12' ORDER BY id_audit;
+
+SELECT count(*) AS lignes, count(DISTINCT id_operation) AS ids, string_agg(DISTINCT _id_run, ',') AS runs
+FROM bronze.csv_operations WHERE _source = 'operations/date=2025-02-12/operations.csv';
+-- 45 | 45 | 2025-02-12#2   (manifeste : 45)
+```
+
+**b) Mapping incomplet** — la ligne `MOBILE` retirée de `mapping_canal_tresorerie.csv` : les
+opérations mobile money tombent dans `int_evenements_rejetes`, le test
+`evenements_rejetes_vide` échoue, `dbt_build` passe au rouge sans retry (346 PASS, 1 ERROR,
+95 nœuds sautés, listés dans l'audit). Seed restauré, puis
+`make airflow-reprendre JOUR=2025-02-12 ETAPE=dbt_build` : 442 PASS, le backfill continue.
+
+```sql
+SELECT tentative, statut, nb_pass, nb_error, nb_skip, noeuds_en_echec, noeuds_sautes
+FROM audit.audit_runs WHERE date_logique = '2025-02-12' AND etape = 'dbt_build';
+```
+
+**c) Base arrêtée** — `docker compose stop postgres` pendant `dbt_build` du 10/03, redémarrée
+45 s plus tard : tentative 1 en `ECHEC_TECHNIQUE` (dbt code 2), sa ligne d'audit mise en attente
+puis versée ; tentative 2 en `SUCCES` après le délai de retry.
+
+```sql
+SELECT tentative, statut, debut, fin, message FROM audit.audit_runs
+WHERE date_logique = '2025-03-10' AND etape = 'dbt_build' ORDER BY id_audit;
+```
+
+Le contrôle de volume a levé dix avertissements sur le trimestre, attendus avec ces données (les
+trois fins de mois, à 219, 448 et 670 opérations pour une moyenne de 22 à 93) :
+
+```sql
+SELECT date_logique, message FROM audit.audit_runs
+WHERE etape = 'controler_volume' AND statut = 'AVERTISSEMENT' ORDER BY 1;
+```
+
+**Mesures** (WSL2, 85 runs sans incident) : run moyen **45 s** (médiane 36 s, dont `dbt build`
+~25 s en janvier-février et ~32 s en mars), 2 s entre deux runs. Backfill de 90 jours : 1 h 53
+d'horloge, dont environ 70 min de calcul, le reste étant l'attente des corrections manuelles.
+Pic mémoire du scheduler (`memory.peak` du cgroup) : **685 Mio**, 67 % de sa limite de 1 Gio.
+Estimation pour 365 jours : **5 à 6 h**, `dbt build` s'allongeant avec l'historique.
 
 Mémoire mesurée (`docker stats`) : **778 Mio au repos** pour les 4 services Airflow juste après le
 démarrage (1 066 Mio avec le PostgreSQL du projet), 928 Mio après un `dbt build`. Pic du
@@ -360,7 +479,8 @@ un `dbt build` complet (pic mesuré par le cgroup), soit 53 % de sa limite de 1 
 ## Structure actuelle
 
 ```
-├── airflow/                # image Airflow, DAG imf_quotidien et tests d'intégrité
+├── airflow/                # image Airflow, DAG imf_quotidien, reprise et tests d'intégrité
+├── orchestration/          # commandes du DAG (contrôles, dbt, audit), sans Airflow, et leurs tests
 ├── docker/postgres/init/   # création des bases et des schémas
 ├── dbt/                    # projet dbt : sources bronze, modèles et tests silver, seeds du cadrage
 ├── generator/              # générateur de données (vérité, anomalies, imf_ops) et ses tests

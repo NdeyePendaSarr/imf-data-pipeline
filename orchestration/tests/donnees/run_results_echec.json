@@ -1,0 +1,12 @@
+{
+  "metadata": {"dbt_version": "1.12.7"},
+  "results": [
+    {"unique_id": "seed.imf_dwh.mapping_canal_tresorerie", "status": "success"},
+    {"unique_id": "model.imf_dwh.int_evenements_rejetes", "status": "success"},
+    {"unique_id": "test.imf_dwh.evenements_rejetes_vide", "status": "fail"},
+    {"unique_id": "test.imf_dwh.unique_slv_operations_id_operation", "status": "warn"},
+    {"unique_id": "model.imf_dwh.fct_ecritures", "status": "skipped"},
+    {"unique_id": "model.imf_dwh.mart_balance", "status": "skipped"},
+    {"unique_id": "model.imf_dwh.slv_operations", "status": "success"}
+  ]
+}

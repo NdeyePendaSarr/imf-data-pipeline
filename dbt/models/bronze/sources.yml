@@ -42,3 +42,20 @@ sources:
         description: Pilotage de l'ingestion — plus grand date_maj extrait par table de imf_ops.
       - name: _ingestions
         description: Journal de l'ingestion — une ligne par objet traité et par run (CHARGE, IGNORE, VIDE).
+
+  - name: audit
+    description: >
+      Journal d'exécution du pipeline (phase 7), écrit par python -m orchestration audit depuis
+      le DAG imf_quotidien ; table en ajout seul, créée par orchestration/sql/audit.sql.
+    schema: audit
+    tables:
+      - name: audit_runs
+        description: >
+          Une ligne par tentative de chaque étape (statut SUCCES, AVERTISSEMENT, ECHEC_CONTROLE,
+          ECHEC_TECHNIQUE, NON_EXECUTE ; durée ; lignes chargées ; résultats dbt, nœuds en échec
+          et sautés ; version_mapping ; commit git), plus une ligne etape = RUN par exécution.
+        columns:
+          - name: etape
+            description: Tâche du DAG (verifier_environnement … dbt_build) ou RUN pour le statut global.
+          - name: tentative
+            description: Numéro de tentative Airflow (1, puis 2 et 3 en cas de retry).

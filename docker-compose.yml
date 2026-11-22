@@ -25,6 +25,8 @@ x-airflow-commun: &airflow-commun
     # Un seul worker pour l'api-server (poste de développement).
     AIRFLOW__API__WORKERS: "1"
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # Exercice traité par le DAG imf_quotidien (début et fin du planning).
+    IMF_EXERCICE: ${IMF_EXERCICE:-2025}
     # Connexion du pipeline à PostgreSQL (imf_ops, imf_dwh) : hôte = service postgres, port
     # interne ; mêmes variables que dbt/profiles.yml et l'ingestion.
     POSTGRES_HOST: postgres

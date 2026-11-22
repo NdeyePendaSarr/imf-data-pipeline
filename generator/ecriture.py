@@ -125,16 +125,21 @@ def sha256(chemin: Path) -> str:
 def preparer_sortie(sortie: Path) -> None:
     """Vide le dossier de sortie (aucun reste d'une exécution précédente).
 
-    Par sécurité, un dossier non vide n'est supprimé que s'il contient un manifeste du
-    générateur.
+    Par sécurité, un dossier non vide n'est vidé que s'il contient un manifeste du générateur.
+    Le dossier lui-même est conservé (seul son contenu est supprimé) : un montage Docker de
+    data/ (Airflow, phase 7) reste ainsi valide après une régénération.
     """
     if sortie.exists():
         if any(sortie.iterdir()) and not (sortie / MANIFESTE).exists():
             raise FileExistsError(
                 f"{sortie} n'est pas vide et ne vient pas du générateur : choisis un autre --sortie"
             )
-        shutil.rmtree(sortie)
-    sortie.mkdir(parents=True)
+        for element in sortie.iterdir():
+            if element.is_dir() and not element.is_symlink():
+                shutil.rmtree(element)
+            else:
+                element.unlink()
+    sortie.mkdir(parents=True, exist_ok=True)
 
 
 def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]:
@@ -162,6 +167,9 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
     # Opérations, charges et approvisionnements partitionnés par jour (I11) : un fichier par
     # jour avec des lignes, data/<table>/date=AAAA-MM-JJ/<table>.csv.
     nb_partitions: dict[str, int] = {}
+    # Lignes de données de chaque partition (en-tête exclu) : contrôle de complétude de
+    # l'orchestration (phase 7), lignes chargées en bronze = lignes déclarées par le manifeste.
+    lignes_fichiers: dict[str, int] = {}
     for table, colonne_date in TABLES_PARTITIONNEES.items():
         par_jour: dict[date, list[Any]] = defaultdict(list)
         for ligne in getattr(brut, table):
@@ -169,6 +177,7 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
         for jour in sorted(par_jour):
             chemin = sortie / table / f"date={jour.isoformat()}" / f"{table}.csv"
             ecrire_csv(chemin, CLASSES[table], par_jour[jour])
+            lignes_fichiers[chemin.relative_to(sortie).as_posix()] = len(par_jour[jour])
         nb_partitions[f"partitions_{table}"] = len(par_jour)
 
     empreintes = {
@@ -200,6 +209,7 @@ def ecrire_sorties(verite: Verite, brut: Brut, config: Config) -> dict[str, Any]
             "banque_minimale": ind.banque_minimale,
         },
         "fichiers": empreintes,
+        "lignes_fichiers": dict(sorted(lignes_fichiers.items())),
         # Contenu des tables chargées dans imf_ops (brut, anomalies comprises).
         "imf_ops": {
             table: empreinte_lignes(CLASSES[table], getattr(brut, table))

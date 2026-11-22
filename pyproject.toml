@@ -43,7 +43,7 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", "generator", "ingestion", "airflow"]
+files = ["tests", "generator", "ingestion", "airflow", "orchestration"]
 
 [[tool.mypy.overrides]]
 # Airflow n'est installé que dans son image (phase 7), jamais dans le venv du projet : ses
@@ -51,8 +51,14 @@ files = ["tests", "generator", "ingestion", "airflow"]
 module = ["airflow.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# Sans Airflow en local, ses décorateurs (@task, @teardown) sont non typés : seul le module du
+# DAG est exempté de ce contrôle ; le reste du mode strict s'applique.
+module = ["imf_quotidien"]
+disallow_untyped_decorators = false
+
 [tool.pytest.ini_options]
-testpaths = ["tests", "generator/tests", "ingestion/tests"]
+testpaths = ["tests", "generator/tests", "ingestion/tests", "orchestration/tests"]
 pythonpath = ["."]
 addopts = "--strict-markers"
 markers = [

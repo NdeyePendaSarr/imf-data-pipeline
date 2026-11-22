@@ -199,3 +199,17 @@ def test_date_ligne_du_catalogue(petite_generation: Generation) -> None:
     # Le CSV porte la colonne, au format ISO.
     lignes = lire_csv(petite_generation.config.sortie / "catalogue_anomalies.csv")
     assert all(len(ligne["date_ligne"]) == 10 for ligne in lignes)
+
+
+def test_lignes_par_fichier_du_manifeste(petite_generation: Generation) -> None:
+    """lignes_fichiers : une entrée par partition journalière, = lignes de données du CSV."""
+    sortie = petite_generation.config.sortie
+    lignes_fichiers = petite_generation.manifeste["lignes_fichiers"]
+    partitions = {
+        f.relative_to(sortie).as_posix()
+        for table in ("operations", "charges", "appro_caisse")
+        for f in (sortie / table).glob(f"date=*/{table}.csv")
+    }
+    assert set(lignes_fichiers) == partitions
+    for chemin, nombre in lignes_fichiers.items():
+        assert len(lire_csv(sortie / chemin)) == nombre, chemin

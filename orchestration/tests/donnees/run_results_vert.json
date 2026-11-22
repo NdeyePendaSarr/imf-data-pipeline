@@ -1,0 +1,10 @@
+{
+  "metadata": {"dbt_version": "1.12.7"},
+  "results": [
+    {"unique_id": "seed.imf_dwh.canaux_autorises", "status": "success"},
+    {"unique_id": "model.imf_dwh.slv_operations", "status": "success"},
+    {"unique_id": "test.imf_dwh.not_null_slv_operations_id_operation", "status": "pass"},
+    {"unique_id": "unit_test.imf_dwh.fct_ecritures.fct_ecritures_exemple_cadrage_1", "status": "pass"},
+    {"unique_id": "model.imf_dwh.mart_bilan", "status": "success"}
+  ]
+}

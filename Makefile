@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
 	ingest ingest-range ingest-all reset-bronze \
-	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs test-airflow \
+	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs airflow-reprendre test-airflow \
 	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
@@ -82,6 +82,10 @@ airflow-down: ## Arrête Airflow (la base de métadonnées est conservée)
 
 airflow-logs: ## Suit les journaux des services Airflow
 	$(AIRFLOW) logs -f airflow-api-server airflow-scheduler airflow-dag-processor
+
+airflow-reprendre: ## Reprend un jour en échec : make airflow-reprendre JOUR=AAAA-MM-JJ [ETAPE=…]
+	@test -n "$(JOUR)" || { echo "Usage : make airflow-reprendre JOUR=AAAA-MM-JJ [ETAPE=ingerer]"; exit 2; }
+	$(AIRFLOW) exec -T airflow-scheduler python airflow/reprendre.py $(JOUR) $(ETAPE)
 
 test-airflow: ## Tests d'intégrité des DAG, dans le conteneur Airflow
 	$(AIRFLOW) exec -T airflow-scheduler python -m pytest -q -p no:cacheprovider airflow/tests
