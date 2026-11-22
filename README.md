@@ -4,7 +4,8 @@
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
 
-> 🚧 **Projet en construction** — phase 6 terminée, prochaine étape : orchestration Airflow.
+> 🚧 **Projet en construction** — phase 7 terminée (orchestration Airflow, exercice 2025 rejoué
+> jour par jour), prochaine étape : dashboard Power BI.
 
 ## Objectif
 
@@ -28,7 +29,7 @@ remboursements, charges) en :
 | 4 | Nettoyage et standardisation avec dbt (silver) | ✅ |
 | 5 | Schéma en étoile et écritures comptables (gold) | ✅ |
 | 6 | Balances, états financiers, KPI, rapprochements | ✅ |
-| 7 | Orchestration Airflow | 🚧 |
+| 7 | Orchestration Airflow | ✅ |
 | 8 | Dashboard Power BI | ⬜ |
 | 9 | CI, documentation, entrepôt cloud | ⬜ |
 
@@ -48,8 +49,8 @@ Générateur Python ──► CSV d'agences + base opérationnelle (imf_ops)
 
 | | Outils |
 |---|---|
-| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt_utils) |
-| **Prévu** | Apache Airflow · Power BI · GitHub Actions |
+| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt_utils) · Apache Airflow 3.3 |
+| **Prévu** | Power BI · GitHub Actions |
 
 ## Lancer le projet
 
@@ -348,7 +349,9 @@ make airflow-logs    # journaux
 make airflow-down    # arrêt (la base de métadonnées est conservée)
 ```
 
-Interface : http://localhost:8080 (compte `AIRFLOW_ADMIN_USER` du `.env`).
+Interface : http://localhost:8080 (compte `AIRFLOW_ADMIN_USER` du `.env`). Le composant
+**Triggerer** y apparaît en rouge : c'est voulu, aucun triggerer n'est déployé, car le DAG
+n'utilise aucune tâche différée (le capteur tourne en mode reschedule, sans triggerer).
 
 ### DAG `imf_quotidien`
 
@@ -490,16 +493,64 @@ SELECT date_logique, message FROM audit.audit_runs
 WHERE etape = 'controler_volume' AND statut = 'AVERTISSEMENT' ORDER BY 1;
 ```
 
-**Mesures** (WSL2, 85 runs sans incident) : run moyen **45 s** (médiane 36 s, dont `dbt build`
+**Mesures du trimestre** (WSL2, 85 runs sans incident) : run moyen **45 s** (médiane 36 s, dont `dbt build`
 ~25 s en janvier-février et ~32 s en mars), 2 s entre deux runs. Backfill de 90 jours : 1 h 53
 d'horloge, dont environ 70 min de calcul, le reste étant l'attente des corrections manuelles.
-Pic mémoire du scheduler (`memory.peak` du cgroup) : **685 Mio**, 67 % de sa limite de 1 Gio.
-Estimation pour 365 jours : **5 à 6 h**, `dbt build` s'allongeant avec l'historique.
+Pic mémoire du scheduler (`memory.peak` du cgroup) : **685 Mio**, 67 % de sa limite d'alors
+(1 Gio, portée depuis à 1,5 Gio). L'estimation qui en découlait pour 365 jours (5 à 6 h) s'est
+révélée pessimiste : voir ci-dessous.
+
+### Backfill de l'exercice 2025
+
+Le gold de référence est d'abord calculé en une fois, bronze complet et `dbt build` par défaut :
+`make empreinte-gold FICHIER=docs/phase7/empreinte_gold_reference_31_12.txt`. Puis, depuis un
+état propre (`make reset-bronze`, runs du DAG supprimés par `airflow dags delete` pour que
+chaque jour s'exécute réellement, tentatives à 1 ; l'audit, en ajout seul, est conservé) :
+
+```bash
+docker compose --profile airflow exec airflow-scheduler airflow backfill create \
+  --dag-id imf_quotidien --from-date 2025-01-01 --to-date 2025-12-31 \
+  --max-active-runs 1 --reprocess-behavior completed
+```
+
+Résultat, sans aucune intervention :
+
+| Contrôle | Résultat |
+|---|---|
+| Runs | 365 lignes `RUN` en `SUCCES`, chaque étape à la tentative 1 (2 555 lignes d'audit) |
+| Gold au 31/12 | `make compare-empreintes` : identique à la référence sur les 19 tables |
+| Bilan au 31/12 | actif = passif = **2 119 584 054 XOF** |
+| Résultat de l'exercice | **−333 130 376 XOF** |
+| PAR 30 au 31/12 | 92 511 316 / 1 850 520 623 = **4,9992 %** |
+| Rapprochements | 120 contrôles (12 mois), écart 0 partout |
+| Contrôle de volume | 331 jours contrôlés, **0 avertissement** (ratios de 63 % à 198 %) ; 34 jours sans contrôle (du 01/01 au 03/02 : la tendance remonte à J−35, et le 31/01 n'a pas de fin de mois précédente) |
+| Durée totale | **3 h 27** (16:15:46 → 19:42:56), 2 s entre deux runs |
+| Run moyen | 32 s (médiane 29 s) |
+| Pic mémoire du scheduler | **716 Mio** (`memory.peak`), 47 % de 1,5 Gio, aucun redémarrage |
+
+Durée moyenne d'un run par mois (dont `dbt build`) :
+
+| Mois | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 | 09 | 10 | 11 | 12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Run (s) | 51,5 | 49,5 | 26,8 | 26,3 | 26,9 | 27,1 | 27,9 | 28,2 | 29,2 | 29,8 | 30,8 | 32,8 |
+| dbt (s) | 34,7 | 27,0 | 17,8 | 17,4 | 17,9 | 18,3 | 18,7 | 19,3 | 20,1 | 20,8 | 21,7 | 23,8 |
+
+À partir de mars, `dbt build` s'allonge régulièrement avec l'historique (≈ +0,6 s par mois).
+Janvier et février sont plus lents alors que les données y sont moindres : la machine était
+plus chargée pendant la première heure (jusqu'à 277 s pour `dbt debug` dans
+`verifier_environnement` le 05/02, run le plus long, 325 s) ; l'audit ne permet pas d'en dire
+plus.
+
+```sql
+-- Statuts des runs du backfill (filtre sur son heure de début)
+SELECT statut, count(*) FROM audit.audit_runs
+WHERE debut >= '2026-11-22 16:15:32+00' AND etape = 'RUN' GROUP BY 1;
+```
 
 Mémoire mesurée (`docker stats`) : **778 Mio au repos** pour les 4 services Airflow juste après le
 démarrage (1 066 Mio avec le PostgreSQL du projet), 928 Mio après un `dbt build`. Pic du
 scheduler, où tournent les tâches : 455 Mio pendant `verifier_environnement`, **545 Mio** pendant
-un `dbt build` complet (pic mesuré par le cgroup), soit 53 % de sa limite de 1 Gio.
+un `dbt build` complet (pic mesuré par le cgroup), soit 53 % de sa limite d'alors (1 Gio).
 
 ## Structure actuelle
 
