@@ -8,7 +8,7 @@ Documents de référence du pipeline SenFinance Microcrédit, dans l'ordre de le
 - [P1_phase0_cadrage.md](P1_phase0_cadrage.md) — Phase 0 : plan de comptes, schéma en étoile, règles de mapping (D1 à D21), exemples chiffrés.
 - [P1_phase2_cadrage.md](P1_phase2_cadrage.md) — Phase 2 : générateur de données fictives et anomalies injectées.
 - [P1_phase3_cadrage.md](P1_phase3_cadrage.md) — Phase 3 : ingestion bronze incrémentale et idempotente (I1 à I14).
-- [P1_phase4_cadrage.md](P1_phase4_cadrage.md) — Phase 4 : silver dbt (S1 à S15).
+- [P1_phase4_cadrage.md](P1_phase4_cadrage.md) — Phase 4 : silver dbt (S1 à S17).
 - [P1_phase5_cadrage.md](P1_phase5_cadrage.md) — Phase 5 : gold, dimensions, écritures et faits (G1 à G15).
 - [P1_phase6_cadrage.md](P1_phase6_cadrage.md) — Phase 6 : marts, balances, états financiers, KPI, rapprochements (H1 à H12).
 - [P1_phase7_cadrage.md](P1_phase7_cadrage.md) — Phase 7 : orchestration Airflow, gold « à date », contrôles et audit (J1 à J20).

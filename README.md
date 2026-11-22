@@ -226,8 +226,9 @@ make dbt-build     # seeds + modèles + tests (prérequis : make ingest-all)
 make test-verite   # chaque slv_* = data/_verite/<table>.csv (la vérité n'entre jamais en base)
 ```
 
-`dbt build` sur l'exercice par défaut : **153 PASS, 0 WARN, 0 ERROR** (5 seeds, 25 modèles,
-122 tests de données dont `canal_autorise`, 1 test unitaire de `int_mouvements_compte`). Les tests de catalogue comparent les lignes écartées aux anomalies injectées :
+À la fin de la phase 4, `dbt build` sur l'exercice par défaut donnait **153 PASS, 0 WARN,
+0 ERROR** (5 seeds, 25 modèles, 122 tests de données dont `canal_autorise`, 1 test unitaire de
+`int_mouvements_compte`) ; état actuel du projet : section Marts. Les tests de catalogue comparent les lignes écartées aux anomalies injectées :
 
 | Nature (catalogue) | Table | Lignes du catalogue | Lignes attendues | Lignes écartées |
 |---|---|---:|---:|---:|
@@ -268,8 +269,8 @@ Résultats sur l'exercice par défaut :
 | Caisse minimale (agence, fin de journée) | 3 002 580 XOF, égale à celle du générateur |
 | Banque minimale (fin de journée) | 163 883 235 XOF, égale à celle du générateur |
 | PAR 30 au 31/12 | 92 511 316 / 1 850 520 623 XOF, égal à la vérité au franc près (pytest) |
-| Lignes des faits | portefeuille quotidien 347 012, échéances 34 037, opérations 66 514, remboursements 11 684, soldes mensuels 14 946 |
-| `dbt build` | 352 PASS, 0 WARN, 0 ERROR (303 tests de données, 3 tests unitaires) |
+| Lignes des faits | portefeuille quotidien 404 573 (jours calendaires depuis la phase 6, H1), échéances 34 037, opérations 66 514, remboursements 11 684, soldes mensuels 14 946 |
+| `dbt build` (fin de la phase 5) | 352 PASS, 0 WARN, 0 ERROR (303 tests de données, 3 tests unitaires) |
 
 ## Marts (dbt) : états financiers, rapprochements et KPI
 
@@ -295,7 +296,7 @@ Résultats sur l'exercice par défaut :
 | Taux de remboursement au 31/12 | 999 172 879 / 1 039 096 786 XOF = 96,16 % (paiements anticipés non comptés) |
 | Rapprochements | 120 lignes (12 mois × 5 agences × 2 contrôles), écart 0 partout |
 | Lignes des marts | balance 879, compte de résultat 48, bilan 72, rapprochements 120, KPI 5 283 |
-| `dbt build` | 432 PASS, 0 WARN, 0 ERROR (371 tests de données, 10 tests unitaires, dont les cas chiffrés calculés à la main de `docs/cadrage/P1_cas_chiffres_tests.md`) |
+| `make check` (état actuel, phase 7) | `dbt build` : 442 PASS, 0 WARN, 0 ERROR (381 tests de données, 10 tests unitaires, dont les cas chiffrés calculés à la main de `docs/cadrage/P1_cas_chiffres_tests.md`) ; 203 tests pytest |
 
 ## Arrêté intermédiaire
 

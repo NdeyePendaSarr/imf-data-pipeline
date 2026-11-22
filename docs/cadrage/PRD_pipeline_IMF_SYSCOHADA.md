@@ -210,7 +210,7 @@ Phase 9 (cloud) : fichiers bronze copiés dans Google Cloud Storage ;
 même projet dbt exécuté aussi sur BigQuery (cible `bq`).
 ```
 
-PostgreSQL (MVP) : **une instance, deux bases**. `imf_ops` joue la base opérationnelle (source) ; `imf_dwh` est l'entrepôt, avec les schémas `bronze`, `silver`, `gold` et **`audit`** (journal d'exécution, phase 7) (schémas exacts via `generate_schema_name`, seeds dans `silver`, S2). Les deux bases et les schémas sont créés au premier démarrage par `docker/postgres/init/`. Les tables de `imf_ops` sont créées et rechargées par le générateur (`generator/sql/imf_ops.sql`). Les tables bronze sont créées par l'ingestion (`ingestion/sql/bronze.sql`) ; les extractions de `imf_ops` passent par une zone de landing (`data/landing/imf_ops/`) avant le chargement (I8). Les métadonnées d'Airflow ont leur propre base (`airflow-db`), séparée de l'entrepôt (J6).
+PostgreSQL (MVP) : **une instance, deux bases**. `imf_ops` joue la base opérationnelle (source) ; `imf_dwh` est l'entrepôt, avec les schémas `bronze`, `silver`, `gold` et **`audit`** (journal d'exécution, phase 7) (schémas exacts via `generate_schema_name`, seeds dans `silver`, S2). Les deux bases et les schémas `bronze`, `silver`, `gold` sont créés au premier démarrage par `docker/postgres/init/` ; le schéma `audit` et `audit.audit_runs` sont créés par `orchestration/sql/audit.sql`, à la première écriture d'audit. Les tables de `imf_ops` sont créées et rechargées par le générateur (`generator/sql/imf_ops.sql`). Les tables bronze sont créées par l'ingestion (`ingestion/sql/bronze.sql`) ; les extractions de `imf_ops` passent par une zone de landing (`data/landing/imf_ops/`) avant le chargement (I8). Les métadonnées d'Airflow ont leur propre base (`airflow-db`), séparée de l'entrepôt (J6).
 
 **DAG `imf_quotidien` (phase 7, J8–J11, J19).** `@daily` sur l'exercice, `max_active_runs=1`, `depends_on_past=True` (pas de J+1 sur un J en échec), backfill Airflow 3 ; un run sans `logical_date` est refusé. Sept tâches :
 
@@ -321,7 +321,7 @@ imf-data-pipeline/
 │                              # empreinte-gold, compare-empreintes (phase 7) ; rebuild-bq (phase 9)
 ├── docker-compose.yml         # PostgreSQL (phase 1) ; Airflow, profil `airflow` (phase 7)
 ├── docker/
-│   └── postgres/init/         # création de imf_ops, imf_dwh et des schémas (phase 1 ; audit en phase 7)
+│   └── postgres/init/         # création de imf_ops, imf_dwh et des schémas bronze, silver, gold (phase 1)
 ├── tests/                     # tests d'intégration : socle, bout en bout, vérité silver et gold (phases 1–6)
 ├── data/                      # gitignoré : CSV générés, catalogue des anomalies, manifeste, _verite/ (phase 2) ;
 │                              # landing/imf_ops/ : extractions de l'ingestion (phase 3)
@@ -354,7 +354,7 @@ imf-data-pipeline/
 │   ├── commandes.py           # verifier, attendre, ingerer, completude, volume, dbt
 │   ├── resultats.py           # règles d'évaluation (fonctions pures) : run_results, volume, complétude
 │   ├── audit.py               # lignes de audit.audit_runs (mise en attente si la base est injoignable)
-│   ├── empreinte.py           # empreinte MD5 du gold (make empreinte-gold, compare-empreintes)
+│   ├── empreinte.py           # empreinte MD5 du gold (make empreinte-gold, compare-empreintes) ; table vide notée VIDE
 │   ├── sql/audit.sql          # DDL du schéma audit et de audit.audit_runs
 │   └── tests/
 ├── dbt/
@@ -390,8 +390,6 @@ imf-data-pipeline/
     ├── cadrage/               # versions publiques des cadrages, PRD, cas chiffrés (phases 6–7)
     └── img/                   # architecture, choix techniques (phase 9)
 ```
-
-> Le détail exact de `orchestration/` et `airflow/` (noms de fichiers, emplacement des tests DagBag) est celui du dépôt au commit `0df7529`.
 
 ## 11. Critères de réussite
 
