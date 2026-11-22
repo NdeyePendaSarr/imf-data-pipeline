@@ -1,0 +1,156 @@
+version: 2
+
+# Tests unitaires du bilan et des rapprochements : sections 5 et 6 de
+# docs/cadrage/P1_cas_chiffres_tests.md, attendus recopiés tels quels (agence unique AG_TEST).
+# Le test mart_bilan_niveau_imf (deux agences) n'est pas dans le document : il vérifie H7, qu'un
+# cas à une seule agence ne peut pas distinguer (somme des soldes d'agence = solde de l'IMF).
+
+unit_tests:
+  - name: mart_bilan_cas_chiffre
+    description: >
+      Section 6 du cas chiffré : bilan au 31/01 et au 28/02 au niveau de l'IMF. Au 28/02, la
+      liaison agents (solde créditeur de 50 000) est reclassée en P3_DETTES_TRESORERIE (H8) :
+      trésorerie 950 000 et non 900 000 ; total 1 200 000.
+    model: mart_bilan
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-01-31, dans_exercice: true, est_fin_de_mois: true}
+          - {date: 2025-02-28, dans_exercice: true, est_fin_de_mois: true}
+      - input: ref('dim_compte_comptable')
+        rows:
+          - {code_compte: CREDITS_SAINS, sens_normal: D, etat: BILAN, rubrique: A1_CREDITS_CLIENTELE, rubrique_solde_inverse: null}
+          - {code_compte: TRESO_BANQUE, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: null}
+          - {code_compte: TRESO_CAISSE, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: null}
+          - {code_compte: TRESO_LIAISON_AGENT, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: P3_DETTES_TRESORERIE}
+          - {code_compte: TRESO_LIAISON_MM, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: P3_DETTES_TRESORERIE}
+          - {code_compte: CAPITAL, sens_normal: C, etat: BILAN, rubrique: P1_CAPITAUX_PROPRES, rubrique_solde_inverse: null}
+          - {code_compte: DEPOTS_EPARGNE, sens_normal: C, etat: BILAN, rubrique: P2_DEPOTS_CLIENTELE, rubrique_solde_inverse: null}
+          - {code_compte: PRODUIT_INTERETS, sens_normal: C, etat: CR, rubrique: R1_PRODUITS_FINANCIERS, rubrique_solde_inverse: null}
+          - {code_compte: PRODUIT_PENALITES, sens_normal: C, etat: CR, rubrique: R1_PRODUITS_FINANCIERS, rubrique_solde_inverse: null}
+          - {code_compte: PRODUIT_FRAIS_DOSSIER, sens_normal: C, etat: CR, rubrique: R2_COMMISSIONS, rubrique_solde_inverse: null}
+          - {code_compte: CHARGE_LOYERS, sens_normal: D, etat: CR, rubrique: R4_CHARGES_GENERALES, rubrique_solde_inverse: null}
+      - input: ref('fct_ecritures')
+        rows:
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 300000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 300000}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 6000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, debit: 0, credit: 6000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 20000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 20000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 4500}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, debit: 0, credit: 500}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 1000000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CAPITAL, id_agence: AG_TEST, debit: 0, credit: 1000000}
+          - {date_ecriture: 2025-02-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 50000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_TEST, debit: 0, credit: 50000}
+          - {date_ecriture: 2025-02-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-02-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 5000}
+          - {date_ecriture: 2025-02-15, code_compte: CHARGE_LOYERS, id_agence: AG_TEST, debit: 100000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 100000}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 200000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 200000}
+      - input: ref('mart_compte_resultat')
+        rows:
+          - {date_fin_mois: 2025-01-31, rubrique: R1_PRODUITS_FINANCIERS, resultat_cumul: 5000}
+          - {date_fin_mois: 2025-01-31, rubrique: R2_COMMISSIONS, resultat_cumul: 6000}
+          - {date_fin_mois: 2025-01-31, rubrique: R4_CHARGES_GENERALES, resultat_cumul: 0}
+          - {date_fin_mois: 2025-02-28, rubrique: R1_PRODUITS_FINANCIERS, resultat_cumul: 10000}
+          - {date_fin_mois: 2025-02-28, rubrique: R2_COMMISSIONS, resultat_cumul: 6000}
+          - {date_fin_mois: 2025-02-28, rubrique: R4_CHARGES_GENERALES, resultat_cumul: -100000}
+    expect:
+      rows:
+        - {date_fin_mois: 2025-01-31, ordre: 1, cote: ACTIF, rubrique: A1_CREDITS_CLIENTELE, montant: 275000}
+        - {date_fin_mois: 2025-01-31, ordre: 2, cote: ACTIF, rubrique: A2_TRESORERIE, montant: 1050000}
+        - {date_fin_mois: 2025-01-31, ordre: 3, cote: PASSIF, rubrique: P1_CAPITAUX_PROPRES, montant: 1000000}
+        - {date_fin_mois: 2025-01-31, ordre: 4, cote: PASSIF, rubrique: RESULTAT_CUMULE, montant: 11000}
+        - {date_fin_mois: 2025-01-31, ordre: 5, cote: PASSIF, rubrique: P2_DEPOTS_CLIENTELE, montant: 314000}
+        - {date_fin_mois: 2025-01-31, ordre: 6, cote: PASSIF, rubrique: P3_DETTES_TRESORERIE, montant: 0}
+        - {date_fin_mois: 2025-02-28, ordre: 1, cote: ACTIF, rubrique: A1_CREDITS_CLIENTELE, montant: 250000}
+        - {date_fin_mois: 2025-02-28, ordre: 2, cote: ACTIF, rubrique: A2_TRESORERIE, montant: 950000}
+        - {date_fin_mois: 2025-02-28, ordre: 3, cote: PASSIF, rubrique: P1_CAPITAUX_PROPRES, montant: 1000000}
+        - {date_fin_mois: 2025-02-28, ordre: 4, cote: PASSIF, rubrique: RESULTAT_CUMULE, montant: -84000}
+        - {date_fin_mois: 2025-02-28, ordre: 5, cote: PASSIF, rubrique: P2_DEPOTS_CLIENTELE, montant: 234000}
+        - {date_fin_mois: 2025-02-28, ordre: 6, cote: PASSIF, rubrique: P3_DETTES_TRESORERIE, montant: 50000}
+
+  - name: mart_bilan_niveau_imf
+    description: >
+      H7 : deux agences au 31/01. Liaison agents débitrice de 30 000 à AG_A (dépôt collecté) et
+      créditrice de 50 000 à AG_B (retrait servi) : solde IMF créditeur de 20 000 → P3 = 20 000,
+      jamais A2 + 30 000 et P3 + 50 000 (somme des soldes d'agence). Caisse 60 000 à AG_B.
+      Actif 60 000 = P2 40 000 + P3 20 000.
+    model: mart_bilan
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-01-31, dans_exercice: true, est_fin_de_mois: true}
+      - input: ref('dim_compte_comptable')
+        rows:
+          - {code_compte: CREDITS_SAINS, sens_normal: D, etat: BILAN, rubrique: A1_CREDITS_CLIENTELE, rubrique_solde_inverse: null}
+          - {code_compte: TRESO_BANQUE, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: null}
+          - {code_compte: TRESO_CAISSE, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: null}
+          - {code_compte: TRESO_LIAISON_AGENT, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: P3_DETTES_TRESORERIE}
+          - {code_compte: TRESO_LIAISON_MM, sens_normal: D, etat: BILAN, rubrique: A2_TRESORERIE, rubrique_solde_inverse: P3_DETTES_TRESORERIE}
+          - {code_compte: CAPITAL, sens_normal: C, etat: BILAN, rubrique: P1_CAPITAUX_PROPRES, rubrique_solde_inverse: null}
+          - {code_compte: DEPOTS_EPARGNE, sens_normal: C, etat: BILAN, rubrique: P2_DEPOTS_CLIENTELE, rubrique_solde_inverse: null}
+          - {code_compte: PRODUIT_INTERETS, sens_normal: C, etat: CR, rubrique: R1_PRODUITS_FINANCIERS, rubrique_solde_inverse: null}
+          - {code_compte: PRODUIT_PENALITES, sens_normal: C, etat: CR, rubrique: R1_PRODUITS_FINANCIERS, rubrique_solde_inverse: null}
+          - {code_compte: PRODUIT_FRAIS_DOSSIER, sens_normal: C, etat: CR, rubrique: R2_COMMISSIONS, rubrique_solde_inverse: null}
+          - {code_compte: CHARGE_LOYERS, sens_normal: D, etat: CR, rubrique: R4_CHARGES_GENERALES, rubrique_solde_inverse: null}
+      - input: ref('fct_ecritures')
+        rows:
+          - {date_ecriture: 2025-01-10, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_A, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-01-10, code_compte: DEPOTS_EPARGNE, id_agence: AG_A, debit: 0, credit: 30000}
+          - {date_ecriture: 2025-01-12, code_compte: TRESO_CAISSE, id_agence: AG_B, debit: 60000, credit: 0}
+          - {date_ecriture: 2025-01-12, code_compte: DEPOTS_EPARGNE, id_agence: AG_B, debit: 0, credit: 60000}
+          - {date_ecriture: 2025-01-20, code_compte: DEPOTS_EPARGNE, id_agence: AG_B, debit: 50000, credit: 0}
+          - {date_ecriture: 2025-01-20, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_B, debit: 0, credit: 50000}
+      - input: ref('mart_compte_resultat')
+        rows: []
+    expect:
+      rows:
+        - {date_fin_mois: 2025-01-31, ordre: 1, cote: ACTIF, rubrique: A1_CREDITS_CLIENTELE, montant: 0}
+        - {date_fin_mois: 2025-01-31, ordre: 2, cote: ACTIF, rubrique: A2_TRESORERIE, montant: 60000}
+        - {date_fin_mois: 2025-01-31, ordre: 3, cote: PASSIF, rubrique: P1_CAPITAUX_PROPRES, montant: 0}
+        - {date_fin_mois: 2025-01-31, ordre: 4, cote: PASSIF, rubrique: RESULTAT_CUMULE, montant: 0}
+        - {date_fin_mois: 2025-01-31, ordre: 5, cote: PASSIF, rubrique: P2_DEPOTS_CLIENTELE, montant: 40000}
+        - {date_fin_mois: 2025-01-31, ordre: 6, cote: PASSIF, rubrique: P3_DETTES_TRESORERIE, montant: 20000}
+
+  - name: mart_rapprochements_cas_chiffre
+    description: >
+      Section 5 du cas chiffré : CREDITS 275 000 / 250 000 et DEPOTS 314 000 / 234 000, gestion =
+      compta, écart 0 au 31/01 et au 28/02.
+    model: mart_rapprochements
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-01-31, dans_exercice: true, est_fin_de_mois: true}
+          - {date: 2025-02-28, dans_exercice: true, est_fin_de_mois: true}
+      - input: ref('dim_client')
+        rows:
+          - {id_client: CLI_TEST, id_agence: AG_TEST}
+      - input: ref('fct_solde_compte_mensuel')
+        rows:
+          - {date_fin_mois: 2025-01-31, id_agence: AG_TEST, solde: 314000}
+          - {date_fin_mois: 2025-02-28, id_agence: AG_TEST, solde: 234000}
+      - input: ref('fct_portefeuille_quotidien')
+        rows:
+          - {date: 2025-01-30, id_agence: AG_TEST, encours: 275000}
+          - {date: 2025-01-31, id_agence: AG_TEST, encours: 275000}
+          - {date: 2025-02-28, id_agence: AG_TEST, encours: 250000}
+      - input: ref('mart_balance')
+        rows:
+          - {date_fin_mois: 2025-01-31, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, solde_cloture_debit: 0, solde_cloture_credit: 314000}
+          - {date_fin_mois: 2025-01-31, code_compte: CREDITS_SAINS, id_agence: AG_TEST, solde_cloture_debit: 275000, solde_cloture_credit: 0}
+          - {date_fin_mois: 2025-02-28, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, solde_cloture_debit: 0, solde_cloture_credit: 234000}
+          - {date_fin_mois: 2025-02-28, code_compte: CREDITS_SAINS, id_agence: AG_TEST, solde_cloture_debit: 250000, solde_cloture_credit: 0}
+          - {date_fin_mois: 2025-02-28, code_compte: TRESO_BANQUE, id_agence: AG_TEST, solde_cloture_debit: 700000, solde_cloture_credit: 0}
+    expect:
+      rows:
+        - {date_fin_mois: 2025-01-31, id_agence: AG_TEST, controle: CREDITS, valeur_gestion: 275000, valeur_compta: 275000, ecart: 0}
+        - {date_fin_mois: 2025-01-31, id_agence: AG_TEST, controle: DEPOTS, valeur_gestion: 314000, valeur_compta: 314000, ecart: 0}
+        - {date_fin_mois: 2025-02-28, id_agence: AG_TEST, controle: CREDITS, valeur_gestion: 250000, valeur_compta: 250000, ecart: 0}
+        - {date_fin_mois: 2025-02-28, id_agence: AG_TEST, controle: DEPOTS, valeur_gestion: 234000, valeur_compta: 234000, ecart: 0}

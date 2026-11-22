@@ -80,3 +80,43 @@ def test_soldes_au_31_12_egaux_verite() -> None:
 
 def test_dossier_verite_present() -> None:
     assert Path(VERITE / "par30.csv").exists(), "lance `make generate`"
+
+
+def produits_et_charges_verite() -> dict[str, int]:
+    """Produits et charges de l'exercice recalculés depuis data/_verite/ (oracle hors dbt)."""
+    remboursements = lire("remboursements")
+    totaux = {
+        "interets": sum(int(r["part_interets"]) for r in remboursements),
+        "penalites": sum(int(r["penalites"]) for r in remboursements),
+        "frais_dossier": sum(int(c["frais_dossier"]) for c in lire("credits")),
+        "frais_tenue": sum(
+            int(o["montant"]) for o in lire("operations") if o["type_operation"] == "FRAIS_TENUE"
+        ),
+    }
+    for charge in lire("charges"):
+        cle = f"charge_{charge['categorie'].lower()}"
+        totaux[cle] = totaux.get(cle, 0) + int(charge["montant"])
+    return totaux
+
+
+def test_compte_de_resultat_egal_verite() -> None:
+    """Cumul au 31/12 de mart_compte_resultat = produits et charges de la vérité, par rubrique."""
+    v = produits_et_charges_verite()
+    attendu = {
+        "R1_PRODUITS_FINANCIERS": v["interets"] + v["penalites"],
+        "R2_COMMISSIONS": v["frais_dossier"] + v["frais_tenue"],
+        "R3_CHARGES_PERSONNEL": v["charge_personnel"],
+        "R4_CHARGES_GENERALES": v["charge_loyers"]
+        + v["charge_telecom_si"]
+        + v["charge_fournitures"]
+        + v["charge_commissions_mm"],
+    }
+    lignes = requete(
+        "SELECT rubrique, montant_cumul, resultat_cumul FROM gold.mart_compte_resultat "
+        "WHERE date_fin_mois = (SELECT max(date) FROM gold.dim_date WHERE dans_exercice)"
+    )
+    obtenu = {str(r): int(str(m)) for r, m, _ in lignes}
+    assert obtenu == attendu
+    produits = attendu["R1_PRODUITS_FINANCIERS"] + attendu["R2_COMMISSIONS"]
+    charges = attendu["R3_CHARGES_PERSONNEL"] + attendu["R4_CHARGES_GENERALES"]
+    assert sum(int(str(res)) for _, _, res in lignes) == produits - charges

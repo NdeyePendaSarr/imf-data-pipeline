@@ -300,6 +300,13 @@ Résultats sur l'exercice par défaut :
   make reset-bronze.
 - La base opérationnelle simulée ne conserve que l'état au 31/12 : le statut des crédits n'est pas
   historisé.
+- Pas de comptes de tiers par agent : les liaisons sont classées sur leur solde au niveau de l'IMF
+  (écart chiffré : 16 137 323 XOF au 30/11/2025 entre P3 au niveau de l'IMF et la somme des soldes
+  créditeurs par agence ; 9 590 935 XOF au 31/12/2025).
+- Commissions mobile money de décembre facturées en janvier suivant : hors exercice (pas de charges
+  à payer).
+- Remboursements partiels : imputation pénalités → intérêts → capital par échéance ; 243 soldes
+  d'échéance sans intérêts.
 
 ## Licence
 

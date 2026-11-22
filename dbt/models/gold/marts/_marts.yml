@@ -112,3 +112,94 @@ models:
         data_type: bigint
         description: Contribution cumulée au résultat depuis le 01/01.
         data_tests: [not_null]
+
+  - name: mart_bilan
+    description: >
+      Bilan simplifié au niveau de l'IMF (H7) : rubrique × fin de mois. Soldes sur mouvements
+      cumulés agrégés de toutes les agences ; solde inversé reclassé dans rubrique_solde_inverse
+      (H8) ; résultat cumulé (mart_compte_resultat) au passif. Actif = passif + résultat (test).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [date_fin_mois, rubrique]
+    columns:
+      - name: date_fin_mois
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: ordre
+        data_type: integer
+        description: Ordre de présentation dans le mois (A1, A2, P1, résultat, P2, P3).
+        data_tests: [not_null]
+      - name: cote
+        data_type: text
+        description: ACTIF ou PASSIF (le résultat cumulé est au passif).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ACTIF, PASSIF]
+      - name: rubrique
+        data_type: text
+        description: Rubrique du bilan, ou RESULTAT_CUMULE.
+        data_tests: [not_null]
+      - name: montant
+        data_type: bigint
+        description: Montant de la rubrique en XOF (actif D − C, passif C − D ; résultat négatif si perte).
+        data_tests: [not_null]
+
+  - name: mart_rapprochements
+    description: >
+      Rapprochements gestion ↔ comptabilité (D9, H10) : fin de mois × agence × contrôle (DEPOTS,
+      CREDITS), valeur de gestion, valeur comptable et écart (gestion − compta), attendu nul.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [date_fin_mois, id_agence, controle]
+    columns:
+      - name: date_fin_mois
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: controle
+        data_type: text
+        description: DEPOTS (dépôts de la clientèle) ou CREDITS (encours de crédit).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [DEPOTS, CREDITS]
+      - name: valeur_gestion
+        data_type: bigint
+        description: Σ soldes des comptes clients (DEPOTS) ou Σ encours (CREDITS) en fin de mois.
+        data_tests: [not_null]
+      - name: valeur_compta
+        data_type: bigint
+        description: Solde de clôture de DEPOTS_EPARGNE ou de CREDITS_SAINS dans mart_balance.
+        data_tests: [not_null]
+      - name: ecart
+        data_type: bigint
+        description: valeur_gestion − valeur_compta (attendu 0).
+        data_tests: [not_null]
