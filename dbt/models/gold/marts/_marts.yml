@@ -1,0 +1,114 @@
+version: 2
+
+models:
+  - name: mart_balance
+    description: >
+      Balance mensuelle à 6 colonnes (H5) : compte × agence × fin de mois de l'exercice ; solde
+      d'ouverture D/C, mouvements D/C, solde de clôture D/C. Ouverture de janvier = 0 ;
+      densification dès le premier mouvement (H6).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [date_fin_mois, code_compte, id_agence]
+    columns:
+      - name: date_fin_mois
+        data_type: date
+        description: Fin du mois de la balance.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: code_compte
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_compte_comptable')
+                field: code_compte
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: solde_ouverture_debit
+        data_type: bigint
+        description: Solde débiteur au début du mois (= clôture débitrice du mois précédent ; 0 en janvier).
+        data_tests: [not_null]
+      - name: solde_ouverture_credit
+        data_type: bigint
+        description: Solde créditeur au début du mois.
+        data_tests: [not_null]
+      - name: mouvement_debit
+        data_type: bigint
+        description: Total des débits du mois.
+        data_tests: [not_null]
+      - name: mouvement_credit
+        data_type: bigint
+        description: Total des crédits du mois.
+        data_tests: [not_null]
+      - name: solde_cloture_debit
+        data_type: bigint
+        description: Solde débiteur en fin de mois (0 si le solde est créditeur).
+        data_tests: [not_null]
+      - name: solde_cloture_credit
+        data_type: bigint
+        description: Solde créditeur en fin de mois (0 si le solde est débiteur).
+        data_tests: [not_null]
+
+  - name: mart_compte_resultat
+    description: >
+      Compte de résultat (H9) : rubrique × fin de mois de l'exercice, montant du mois et cumul.
+      Résultat = Σ resultat_* sur les rubriques = produits − charges (pas d'écriture de clôture).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [date_fin_mois, rubrique]
+    columns:
+      - name: date_fin_mois
+        data_type: date
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: rubrique
+        data_type: text
+        description: Rubrique du compte de résultat (R1 à R6 du plan de comptes).
+        data_tests: [not_null]
+      - name: type_rubrique
+        data_type: text
+        description: PRODUITS, CHARGES ou MIXTE, déduit de la nature des comptes de la rubrique.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [PRODUITS, CHARGES, MIXTE]
+      - name: montant_mois
+        data_type: bigint
+        description: Montant du mois dans le sens de la rubrique (produits C − D, charges D − C).
+        data_tests: [not_null]
+      - name: montant_cumul
+        data_type: bigint
+        description: Cumul depuis le 01/01, dans le sens de la rubrique.
+        data_tests: [not_null]
+      - name: resultat_mois
+        data_type: bigint
+        description: Contribution du mois au résultat (crédit − débit).
+        data_tests: [not_null]
+      - name: resultat_cumul
+        data_type: bigint
+        description: Contribution cumulée au résultat depuis le 01/01.
+        data_tests: [not_null]

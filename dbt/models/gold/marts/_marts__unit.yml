@@ -1,0 +1,154 @@
+version: 2
+
+# Tests unitaires des marts : cas chiffrés de docs/cadrage/P1_cas_chiffres_tests.md, attendus
+# recopiés tels quels (une seule agence AG_TEST ; cases vides du document = 0).
+#   Section 2 → balance de janvier ; section 3 → balance de février ; section 4 → compte de résultat.
+# Les écritures (section 1) sont données au grain de fct_ecritures ; leur jour dans le mois est
+# indifférent pour des marts mensuels (15 du mois).
+
+unit_tests:
+  - name: mart_balance_cas_chiffre_janvier
+    description: Section 2 du cas chiffré — balance de janvier, ouverture = 0 (H5).
+    model: mart_balance
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-01-31, dans_exercice: true, est_fin_de_mois: true}
+      - input: ref('fct_ecritures')
+        rows:
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 300000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 300000}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 6000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, debit: 0, credit: 6000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 20000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 20000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 4500}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, debit: 0, credit: 500}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 1000000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CAPITAL, id_agence: AG_TEST, debit: 0, credit: 1000000}
+    expect:
+      rows:
+        - {date_fin_mois: 2025-01-31, code_compte: CAPITAL, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 1000000, solde_cloture_debit: 0, solde_cloture_credit: 1000000}
+        - {date_fin_mois: 2025-01-31, code_compte: TRESO_BANQUE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 1000000, mouvement_credit: 0, solde_cloture_debit: 1000000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: TRESO_CAISSE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 20000, mouvement_credit: 0, solde_cloture_debit: 20000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 30000, mouvement_credit: 0, solde_cloture_debit: 30000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: CREDITS_SAINS, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 300000, mouvement_credit: 25000, solde_cloture_debit: 275000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 6000, mouvement_credit: 320000, solde_cloture_debit: 0, solde_cloture_credit: 314000}
+        - {date_fin_mois: 2025-01-31, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 6000, solde_cloture_debit: 0, solde_cloture_credit: 6000}
+        - {date_fin_mois: 2025-01-31, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 4500, solde_cloture_debit: 0, solde_cloture_credit: 4500}
+        - {date_fin_mois: 2025-01-31, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 500, solde_cloture_debit: 0, solde_cloture_credit: 500}
+
+  - name: mart_balance_cas_chiffre_fevrier
+    description: >
+      Section 3 du cas chiffré — balance de février à 6 colonnes, densification (H6) : CAPITAL,
+      TRESO_LIAISON_MM, PRODUIT_FRAIS_DOSSIER et PRODUIT_PENALITES présents sans mouvement. Les
+      lignes de janvier (section 2) sont aussi produites, puisque l'exercice commence en janvier.
+    model: mart_balance
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-01-31, dans_exercice: true, est_fin_de_mois: true}
+          - {date: 2025-02-28, dans_exercice: true, est_fin_de_mois: true}
+      - input: ref('fct_ecritures')
+        rows:
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 300000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 300000}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 6000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, debit: 0, credit: 6000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 20000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 20000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 4500}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, debit: 0, credit: 500}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 1000000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CAPITAL, id_agence: AG_TEST, debit: 0, credit: 1000000}
+          - {date_ecriture: 2025-02-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 50000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_TEST, debit: 0, credit: 50000}
+          - {date_ecriture: 2025-02-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-02-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 5000}
+          - {date_ecriture: 2025-02-15, code_compte: CHARGE_LOYERS, id_agence: AG_TEST, debit: 100000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 100000}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 200000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 200000}
+    expect:
+      rows:
+        - {date_fin_mois: 2025-01-31, code_compte: CAPITAL, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 1000000, solde_cloture_debit: 0, solde_cloture_credit: 1000000}
+        - {date_fin_mois: 2025-01-31, code_compte: TRESO_BANQUE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 1000000, mouvement_credit: 0, solde_cloture_debit: 1000000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: TRESO_CAISSE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 20000, mouvement_credit: 0, solde_cloture_debit: 20000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 30000, mouvement_credit: 0, solde_cloture_debit: 30000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: CREDITS_SAINS, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 300000, mouvement_credit: 25000, solde_cloture_debit: 275000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-01-31, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 6000, mouvement_credit: 320000, solde_cloture_debit: 0, solde_cloture_credit: 314000}
+        - {date_fin_mois: 2025-01-31, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 6000, solde_cloture_debit: 0, solde_cloture_credit: 6000}
+        - {date_fin_mois: 2025-01-31, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 4500, solde_cloture_debit: 0, solde_cloture_credit: 4500}
+        - {date_fin_mois: 2025-01-31, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 500, solde_cloture_debit: 0, solde_cloture_credit: 500}
+        - {date_fin_mois: 2025-02-28, code_compte: CAPITAL, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 1000000, mouvement_debit: 0, mouvement_credit: 0, solde_cloture_debit: 0, solde_cloture_credit: 1000000}
+        - {date_fin_mois: 2025-02-28, code_compte: TRESO_BANQUE, id_agence: AG_TEST, solde_ouverture_debit: 1000000, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 300000, solde_cloture_debit: 700000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-02-28, code_compte: TRESO_CAISSE, id_agence: AG_TEST, solde_ouverture_debit: 20000, solde_ouverture_credit: 0, mouvement_debit: 200000, mouvement_credit: 0, solde_cloture_debit: 220000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-02-28, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, solde_ouverture_debit: 30000, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 0, solde_cloture_debit: 30000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-02-28, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 50000, solde_cloture_debit: 0, solde_cloture_credit: 50000}
+        - {date_fin_mois: 2025-02-28, code_compte: CREDITS_SAINS, id_agence: AG_TEST, solde_ouverture_debit: 275000, solde_ouverture_credit: 0, mouvement_debit: 0, mouvement_credit: 25000, solde_cloture_debit: 250000, solde_cloture_credit: 0}
+        - {date_fin_mois: 2025-02-28, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 314000, mouvement_debit: 80000, mouvement_credit: 0, solde_cloture_debit: 0, solde_cloture_credit: 234000}
+        - {date_fin_mois: 2025-02-28, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 6000, mouvement_debit: 0, mouvement_credit: 0, solde_cloture_debit: 0, solde_cloture_credit: 6000}
+        - {date_fin_mois: 2025-02-28, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 4500, mouvement_debit: 0, mouvement_credit: 5000, solde_cloture_debit: 0, solde_cloture_credit: 9500}
+        - {date_fin_mois: 2025-02-28, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 500, mouvement_debit: 0, mouvement_credit: 0, solde_cloture_debit: 0, solde_cloture_credit: 500}
+        - {date_fin_mois: 2025-02-28, code_compte: CHARGE_LOYERS, id_agence: AG_TEST, solde_ouverture_debit: 0, solde_ouverture_credit: 0, mouvement_debit: 100000, mouvement_credit: 0, solde_cloture_debit: 100000, solde_cloture_credit: 0}
+
+  - name: mart_compte_resultat_cas_chiffre
+    description: >
+      Section 4 du cas chiffré — R1 5 000 / 5 000 (cumul 10 000), R2 6 000 / 0 (6 000),
+      R4 0 / 100 000 (100 000) ; résultat = Σ resultat_* : 11 000 en janvier, −95 000 en février,
+      −84 000 cumulé fin février.
+    model: mart_compte_resultat
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-01-31, dans_exercice: true, est_fin_de_mois: true}
+          - {date: 2025-02-28, dans_exercice: true, est_fin_de_mois: true}
+      - input: ref('dim_compte_comptable')
+        rows:
+          - {code_compte: PRODUIT_INTERETS, rubrique: R1_PRODUITS_FINANCIERS, nature: PRODUIT, etat: CR}
+          - {code_compte: PRODUIT_PENALITES, rubrique: R1_PRODUITS_FINANCIERS, nature: PRODUIT, etat: CR}
+          - {code_compte: PRODUIT_FRAIS_DOSSIER, rubrique: R2_COMMISSIONS, nature: PRODUIT, etat: CR}
+          - {code_compte: CHARGE_LOYERS, rubrique: R4_CHARGES_GENERALES, nature: CHARGE, etat: CR}
+          - {code_compte: CAPITAL, rubrique: P1_CAPITAUX_PROPRES, nature: PASSIF, etat: BILAN}
+          - {code_compte: TRESO_BANQUE, rubrique: A2_TRESORERIE, nature: ACTIF, etat: BILAN}
+          - {code_compte: TRESO_CAISSE, rubrique: A2_TRESORERIE, nature: ACTIF, etat: BILAN}
+          - {code_compte: TRESO_LIAISON_MM, rubrique: A2_TRESORERIE, nature: ACTIF, etat: BILAN}
+          - {code_compte: TRESO_LIAISON_AGENT, rubrique: A2_TRESORERIE, nature: ACTIF, etat: BILAN}
+          - {code_compte: CREDITS_SAINS, rubrique: A1_CREDITS_CLIENTELE, nature: ACTIF, etat: BILAN}
+          - {code_compte: DEPOTS_EPARGNE, rubrique: P2_DEPOTS_CLIENTELE, nature: PASSIF, etat: BILAN}
+      - input: ref('fct_ecritures')
+        rows:
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 300000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 300000}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 6000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_FRAIS_DOSSIER, id_agence: AG_TEST, debit: 0, credit: 6000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 20000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 0, credit: 20000}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_LIAISON_MM, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 4500}
+          - {date_ecriture: 2025-01-15, code_compte: PRODUIT_PENALITES, id_agence: AG_TEST, debit: 0, credit: 500}
+          - {date_ecriture: 2025-01-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 1000000, credit: 0}
+          - {date_ecriture: 2025-01-15, code_compte: CAPITAL, id_agence: AG_TEST, debit: 0, credit: 1000000}
+          - {date_ecriture: 2025-02-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 50000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_TEST, debit: 0, credit: 50000}
+          - {date_ecriture: 2025-02-15, code_compte: DEPOTS_EPARGNE, id_agence: AG_TEST, debit: 30000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: CREDITS_SAINS, id_agence: AG_TEST, debit: 0, credit: 25000}
+          - {date_ecriture: 2025-02-15, code_compte: PRODUIT_INTERETS, id_agence: AG_TEST, debit: 0, credit: 5000}
+          - {date_ecriture: 2025-02-15, code_compte: CHARGE_LOYERS, id_agence: AG_TEST, debit: 100000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 100000}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 200000, credit: 0}
+          - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 200000}
+    expect:
+      rows:
+        - {date_fin_mois: 2025-01-31, rubrique: R1_PRODUITS_FINANCIERS, type_rubrique: PRODUITS, montant_mois: 5000, montant_cumul: 5000, resultat_mois: 5000, resultat_cumul: 5000}
+        - {date_fin_mois: 2025-02-28, rubrique: R1_PRODUITS_FINANCIERS, type_rubrique: PRODUITS, montant_mois: 5000, montant_cumul: 10000, resultat_mois: 5000, resultat_cumul: 10000}
+        - {date_fin_mois: 2025-01-31, rubrique: R2_COMMISSIONS, type_rubrique: PRODUITS, montant_mois: 6000, montant_cumul: 6000, resultat_mois: 6000, resultat_cumul: 6000}
+        - {date_fin_mois: 2025-02-28, rubrique: R2_COMMISSIONS, type_rubrique: PRODUITS, montant_mois: 0, montant_cumul: 6000, resultat_mois: 0, resultat_cumul: 6000}
+        - {date_fin_mois: 2025-01-31, rubrique: R4_CHARGES_GENERALES, type_rubrique: CHARGES, montant_mois: 0, montant_cumul: 0, resultat_mois: 0, resultat_cumul: 0}
+        - {date_fin_mois: 2025-02-28, rubrique: R4_CHARGES_GENERALES, type_rubrique: CHARGES, montant_mois: 100000, montant_cumul: 100000, resultat_mois: -100000, resultat_cumul: -100000}
