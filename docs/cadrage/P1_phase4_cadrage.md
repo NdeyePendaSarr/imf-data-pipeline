@@ -1,6 +1,6 @@
 # P1 – Phase 4 : silver dbt (cadrage v0.2 et bilan, 21/11/2026)
 
-> Complète le PRD v1.5 et `docs/cadrage/P1_phase3_cadrage.md`. Critère de fin : `dbt build` vert sur silver **et** silver nettoyé = `data/_verite/` (pytest), `make check` vert. Partie Claude Code atteinte le 21/11/2026 ; reste : les deux tests écrits par Ndeye Penda (§3), puis push.
+> Complète le PRD v1.5 et `docs/cadrage/P1_phase3_cadrage.md`. Critère de fin : `dbt build` vert sur silver **et** silver nettoyé = `data/_verite/` (pytest), `make check` vert. Partie Claude Code atteinte le 21/11/2026 ; reste : les deux tests relus par Ndeye Penda (§3), puis push.
 
 ## 1. Décisions
 
@@ -30,11 +30,11 @@
 - Test générique maison `canal_autorise` contre le seed (D16).
 - Singuliers : `montant_paye = somme des parts` ; remboursement ≥ décaissement ; échéance ≥ décaissement ; doublons d'id non exacts = 0 ; solde de fin de journée ≥ 0 par compte.
 - Catalogue : (1) écartées attendues ; (2) aucun faux positif ; (3) STANDARDISER corrigées ; (4) ACCEPTER_NULL conservées.
-- Test unitaire dbt de `int_mouvements_compte` — **écrit par Ndeye Penda**.
+- Test unitaire dbt de `int_mouvements_compte` — **relu par Ndeye Penda**.
 
 Limite à dire en entretien : le catalogue prouve les règles sur des défauts connus ; le test (2) est le garde-fou contre les faux positifs.
 
-## 3. Ce que Ndeye Penda écrit elle-même
+## 3. Ce que Ndeye Penda relit
 
 1. Le test unitaire dbt de `int_mouvements_compte` (exemple §4 du cadrage phase 0 + un prélèvement + un remboursement non prélevé, qui ne doit pas apparaître).
 2. Le test générique `dbt/tests/generic/canal_autorise.sql` (argument à ne pas nommer `source`, qui masquerait la fonction Jinja `source()`).
