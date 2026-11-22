@@ -4,7 +4,8 @@
 .DEFAULT_GOAL := help
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
 	ingest ingest-range ingest-all reset-bronze \
-	dbt-deps dbt-build test-verite lint format typecheck test test-all check
+	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs test-airflow \
+	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -68,6 +69,22 @@ dbt-build: ## Seeds + modèles silver + tests dbt (prérequis : make ingest-all)
 
 test-verite: ## Compare chaque slv_* à data/_verite/ (prérequis : make ingest-all dbt-build)
 	uv run pytest tests/test_silver_verite.py
+
+# Airflow (phase 7) : profil « airflow » du docker-compose, secrets lus dans .env.
+AIRFLOW = docker compose --profile airflow
+
+airflow-up: ## Construit l'image et démarre Airflow (attend que tout soit healthy)
+	$(AIRFLOW) up -d --build --wait
+
+airflow-down: ## Arrête Airflow (la base de métadonnées est conservée)
+	$(AIRFLOW) stop airflow-api-server airflow-scheduler airflow-dag-processor airflow-db
+	$(AIRFLOW) rm -f airflow-api-server airflow-scheduler airflow-dag-processor airflow-init airflow-db
+
+airflow-logs: ## Suit les journaux des services Airflow
+	$(AIRFLOW) logs -f airflow-api-server airflow-scheduler airflow-dag-processor
+
+test-airflow: ## Tests d'intégrité des DAG, dans le conteneur Airflow
+	$(AIRFLOW) exec -T airflow-scheduler python -m pytest -q -p no:cacheprovider airflow/tests
 
 lint: ## Vérifie le style (ruff check + ruff format --check)
 	uv run ruff check .

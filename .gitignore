@@ -29,3 +29,9 @@ dbt/.user.yml
 .coverage
 .coverage.*
 htmlcov/
+
+# Airflow : fichiers de mots de passe ou de configuration générés, journaux locaux
+*.generated
+simple_auth_manager_passwords.json*
+airflow/logs/
+airflow/airflow.cfg

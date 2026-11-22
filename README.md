@@ -330,9 +330,37 @@ uv run --env-file .env dbt build --project-dir dbt --profiles-dir dbt --vars '{d
   `statut_au_31_12` est connu dès le décaissement et ne sert à aucun calcul. Les tests pytest de
   vérité ne valent qu'à l'arrêté par défaut (la vérité porte sur l'exercice complet).
 
+## Orchestration (phase 7)
+
+Airflow 3.3.2 (Python 3.12) tourne dans Docker, profil `airflow` du `docker-compose.yml` : base
+de métadonnées `airflow-db` (PostgreSQL 17), `airflow-init` (migration et compte administrateur),
+`airflow-api-server`, `airflow-scheduler`, `airflow-dag-processor`, en LocalExecutor
+(parallélisme 2). L'image contient deux environnements séparés : celui d'Airflow, sans dbt, et le
+venv du projet `/opt/pipeline-venv` (construit par `uv sync --frozen` depuis `uv.lock`, groupe dbt
+compris), sans Airflow. Le dépôt est monté en lecture seule ; seul `data/` est en écriture, et dbt
+écrit ses artefacts hors du dépôt.
+
+```bash
+# Une fois : renseigner dans .env les variables AIRFLOW_* listées dans .env.example
+make airflow-up      # construit l'image et démarre les services (attend qu'ils soient healthy)
+make test-airflow    # intégrité des DAG, dans le conteneur
+make airflow-logs    # journaux
+make airflow-down    # arrêt (la base de métadonnées est conservée)
+```
+
+Interface : http://localhost:8080 (compte `AIRFLOW_ADMIN_USER` du `.env`). Le DAG
+`imf_quotidien` n'a pour l'instant qu'une tâche, `verifier_environnement` (dbt debug, CLI
+d'ingestion, séparation des deux environnements), déclenchée à la main.
+
+Mémoire mesurée (`docker stats`) : **778 Mio au repos** pour les 4 services Airflow juste après le
+démarrage (1 066 Mio avec le PostgreSQL du projet), 928 Mio après un `dbt build`. Pic du
+scheduler, où tournent les tâches : 455 Mio pendant `verifier_environnement`, **545 Mio** pendant
+un `dbt build` complet (pic mesuré par le cgroup), soit 53 % de sa limite de 1 Gio.
+
 ## Structure actuelle
 
 ```
+├── airflow/                # image Airflow, DAG imf_quotidien et tests d'intégrité
 ├── docker/postgres/init/   # création des bases et des schémas
 ├── dbt/                    # projet dbt : sources bronze, modèles et tests silver, seeds du cadrage
 ├── generator/              # générateur de données (vérité, anomalies, imf_ops) et ses tests

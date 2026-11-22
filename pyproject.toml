@@ -43,7 +43,13 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", "generator", "ingestion"]
+files = ["tests", "generator", "ingestion", "airflow"]
+
+[[tool.mypy.overrides]]
+# Airflow n'est installé que dans son image (phase 7), jamais dans le venv du projet : ses
+# imports sont ignorés en local ; les DAG sont testés dans le conteneur (make test-airflow).
+module = ["airflow.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "generator/tests", "ingestion/tests"]
