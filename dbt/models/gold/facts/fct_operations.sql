@@ -13,3 +13,4 @@ select
     cast(o.type_operation <> 'FRAIS_TENUE' as boolean) as est_activite_client
 from {{ ref('slv_operations') }} as o
 inner join {{ ref('slv_comptes') }} as c on c.id_compte = o.id_compte
+where o.date_operation <= {{ date_arrete() }}

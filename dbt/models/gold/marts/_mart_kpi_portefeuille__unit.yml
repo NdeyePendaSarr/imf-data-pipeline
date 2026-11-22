@@ -14,6 +14,10 @@ unit_tests:
       Taux de remboursement FIFO : paye_impute_cumule = min(cumul payé, dû échu cumulé) par
       crédit ; le paiement anticipé du 20/04 n'est imputé qu'à l'échéance du 31/05.
     model: mart_kpi_portefeuille
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:

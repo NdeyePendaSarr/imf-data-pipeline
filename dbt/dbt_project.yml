@@ -16,6 +16,8 @@ vars:
   annees_apres_exercice: 2
   # Version des règles comptables (seeds du cadrage), tracée sur chaque ligne d'écriture.
   version_mapping: 'v0.5'
+  # Date d'arrêté (vide = 31/12 de l'exercice, macro date_arrete) : aucune date du gold au-delà.
+  date_arrete: ''
 
 flags:
   # Aucune statistique d'usage envoyée à dbt Labs.

@@ -12,7 +12,9 @@
 with fins_de_mois as (
     select date as date_fin_mois
     from {{ ref('dim_date') }}
+    -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
+        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
 ),
 
 gestion as (
@@ -22,9 +24,10 @@ gestion as (
 
     union all
 
-    select p.date, p.id_agence, 'CREDITS', sum(p.encours)
+    select f.date_fin_mois, p.id_agence, 'CREDITS', sum(p.encours)
     from {{ ref('fct_portefeuille_quotidien') }} as p
-    inner join fins_de_mois as f on f.date_fin_mois = p.date
+    -- Encours à la date de situation (fin de mois, ou date d'arrêté pour le mois en cours).
+    inner join fins_de_mois as f on least(f.date_fin_mois, {{ date_arrete() }}) = p.date
     group by 1, 2
 ),
 
@@ -62,7 +65,8 @@ select
     cast(k.controle as text) as controle,
     cast(coalesce(g.valeur, 0) as bigint) as valeur_gestion,
     cast(coalesce(c.valeur, 0) as bigint) as valeur_compta,
-    cast(coalesce(g.valeur, 0) - coalesce(c.valeur, 0) as bigint) as ecart
+    cast(coalesce(g.valeur, 0) - coalesce(c.valeur, 0) as bigint) as ecart,
+    cast(least(f.date_fin_mois, {{ date_arrete() }}) as date) as date_situation
 from fins_de_mois as f
 cross join agences as a
 cross join controles as k

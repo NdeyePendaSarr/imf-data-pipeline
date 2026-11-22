@@ -9,7 +9,9 @@
 with fins_de_mois as (
     select date as date_fin_mois
     from {{ ref('dim_date') }}
+    -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
+        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
 ),
 
 mouvements as (
@@ -66,5 +68,7 @@ select
     cast(mouvement_debit as bigint) as mouvement_debit,
     cast(mouvement_credit as bigint) as mouvement_credit,
     cast(greatest(solde_cloture, 0) as bigint) as solde_cloture_debit,
-    cast(greatest(-solde_cloture, 0) as bigint) as solde_cloture_credit
+    cast(greatest(-solde_cloture, 0) as bigint) as solde_cloture_credit,
+    -- Date de situation : fin de mois, ou date d'arrêté pour le mois en cours.
+    cast(least(date_fin_mois, {{ date_arrete() }}) as date) as date_situation
 from avec_ouverture

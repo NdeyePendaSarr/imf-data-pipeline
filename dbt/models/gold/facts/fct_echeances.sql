@@ -2,7 +2,8 @@
 -- Imputation FIFO cumulée : les paiements (capital + intérêts, pénalités exclues) couvrent les
 -- échéances de la plus ancienne à la plus récente. L'échéance k est couverte le premier jour où
 -- le cumul payé atteint le cumul dû des échéances 1 à k.
-{%- set arrete = "cast('" ~ var('exercice') ~ "-12-31' as date)" %}
+{#- Couverture à la date d'arrêté (défaut 31/12 de l'exercice) ; la colonne garde son nom. #}
+{%- set arrete = date_arrete() %}
 
 with echeances as (
     select
@@ -66,3 +67,5 @@ inner join {{ ref('slv_credits') }} as c on c.id_credit = e.id_credit
 inner join {{ ref('slv_clients') }} as cl on cl.id_client = c.id_client
 left join total_paye as t on t.id_credit = e.id_credit
 left join couverture as cv on cv.id_credit = e.id_credit and cv.num_echeance = e.num_echeance
+-- Seuls les crédits décaissés à l'arrêté ; leurs dates prévues peuvent le dépasser (par nature).
+where c.date_decaissement <= {{ date_arrete() }}

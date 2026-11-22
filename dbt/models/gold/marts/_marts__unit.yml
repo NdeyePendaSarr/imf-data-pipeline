@@ -10,6 +10,10 @@ unit_tests:
   - name: mart_balance_cas_chiffre_janvier
     description: Section 2 du cas chiffré — balance de janvier, ouverture = 0 (H5).
     model: mart_balance
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:
@@ -46,6 +50,10 @@ unit_tests:
       TRESO_LIAISON_MM, PRODUIT_FRAIS_DOSSIER et PRODUIT_PENALITES présents sans mouvement. Les
       lignes de janvier (section 2) sont aussi produites, puisque l'exercice commence en janvier.
     model: mart_balance
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:
@@ -103,6 +111,10 @@ unit_tests:
       R4 0 / 100 000 (100 000) ; résultat = Σ resultat_* : 11 000 en janvier, −95 000 en février,
       −84 000 cumulé fin février.
     model: mart_compte_resultat
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:

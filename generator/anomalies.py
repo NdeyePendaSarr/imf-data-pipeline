@@ -8,7 +8,7 @@ lignes ajoutées, avec des identifiants neufs (sauf les copies d'un doublon exac
 import random
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import timedelta
+from datetime import date, timedelta
 
 from generator import config as cfg
 from generator.config import Config
@@ -44,6 +44,10 @@ class LigneCatalogue:
     id_ligne: str
     nombre: int
     traitement_attendu: str
+    # Date de l'événement de la ligne visée (opération, charge) ; pour imf_ops, date à laquelle
+    # la ligne devient visible (date_maj du remboursement, date d'adhésion du client). Permet de
+    # restreindre les tests du catalogue à une date d'arrêté.
+    date_ligne: date
 
 
 @dataclass(frozen=True)
@@ -88,7 +92,14 @@ def _anomalies_operations(
     for i in indices[:n]:
         lignes[i] = replace(lignes[i], canal=variante_canal(rng, lignes[i].canal))
         catalogue.append(
-            LigneCatalogue("FORMAT_CANAL", "operations", lignes[i].id_operation, 1, STANDARDISER)
+            LigneCatalogue(
+                "FORMAT_CANAL",
+                "operations",
+                lignes[i].id_operation,
+                1,
+                STANDARDISER,
+                lignes[i].date_operation,
+            )
         )
     ajouts: list[Operation] = []
     for i in indices[n:]:
@@ -96,7 +107,12 @@ def _anomalies_operations(
         ajouts.extend([lignes[i]] * copies)
         catalogue.append(
             LigneCatalogue(
-                "DOUBLON_EXACT", "operations", lignes[i].id_operation, copies, DEDOUBLONNER
+                "DOUBLON_EXACT",
+                "operations",
+                lignes[i].id_operation,
+                copies,
+                DEDOUBLONNER,
+                lignes[i].date_operation,
             )
         )
     for _ in range(n):
@@ -104,14 +120,28 @@ def _anomalies_operations(
         orphelin = replace(modele, id_operation=ids.nouveau("OPE"), id_compte=ids.nouveau("CPT"))
         ajouts.append(orphelin)
         catalogue.append(
-            LigneCatalogue("ORPHELIN_COMPTE", "operations", orphelin.id_operation, 1, REJETER)
+            LigneCatalogue(
+                "ORPHELIN_COMPTE",
+                "operations",
+                orphelin.id_operation,
+                1,
+                REJETER,
+                orphelin.date_operation,
+            )
         )
     for _ in range(n):
         modele = rng.choice(operations)
         negatif = replace(modele, id_operation=ids.nouveau("OPE"), montant=-modele.montant)
         ajouts.append(negatif)
         catalogue.append(
-            LigneCatalogue("MONTANT_NEGATIF", "operations", negatif.id_operation, 1, REJETER)
+            LigneCatalogue(
+                "MONTANT_NEGATIF",
+                "operations",
+                negatif.id_operation,
+                1,
+                REJETER,
+                negatif.date_operation,
+            )
         )
     lignes.extend(ajouts)
     lignes.sort(key=lambda o: (o.date_operation, o.id_operation))
@@ -128,7 +158,9 @@ def _anomalies_charges(
         ligne = replace(modele, id_charge=ids.nouveau("CHG"), canal="PRELEVEMENT")
         lignes.append(ligne)
         catalogue.append(
-            LigneCatalogue("CANAL_NON_AUTORISE", "charges", ligne.id_charge, 1, REJETER)
+            LigneCatalogue(
+                "CANAL_NON_AUTORISE", "charges", ligne.id_charge, 1, REJETER, ligne.date_charge
+            )
         )
     lignes.sort(key=lambda c: (c.date_charge, c.id_charge))
     return lignes, catalogue
@@ -174,7 +206,14 @@ def _anomalies_remboursements(
         r = ligne(rng.choice(credits_tardifs), -decalage, 0)
         lignes.append(r)
         catalogue.append(
-            LigneCatalogue("DATE_INCOHERENTE", "remboursements", r.id_remboursement, 1, REJETER)
+            LigneCatalogue(
+                "DATE_INCOHERENTE",
+                "remboursements",
+                r.id_remboursement,
+                1,
+                REJETER,
+                r.date_maj.date(),
+            )
         )
     for _ in range(n):
         credit = rng.choice(verite.credits)
@@ -190,7 +229,12 @@ def _anomalies_remboursements(
         lignes.append(r)
         catalogue.append(
             LigneCatalogue(
-                "MONTANT_PAYE_INCOHERENT", "remboursements", r.id_remboursement, 1, REJETER
+                "MONTANT_PAYE_INCOHERENT",
+                "remboursements",
+                r.id_remboursement,
+                1,
+                REJETER,
+                r.date_maj.date(),
             )
         )
     lignes.sort(key=lambda r: r.id_remboursement)
@@ -208,7 +252,14 @@ def _anomalies_clients(
         else:
             lignes[i] = replace(lignes[i], date_naissance=None)
         catalogue.append(
-            LigneCatalogue("NULL_NON_CRITIQUE", "clients", lignes[i].id_client, 1, ACCEPTER_NULL)
+            LigneCatalogue(
+                "NULL_NON_CRITIQUE",
+                "clients",
+                lignes[i].id_client,
+                1,
+                ACCEPTER_NULL,
+                lignes[i].date_adhesion,
+            )
         )
     return lignes, catalogue
 

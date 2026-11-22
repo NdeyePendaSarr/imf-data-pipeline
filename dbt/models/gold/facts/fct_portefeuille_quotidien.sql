@@ -10,7 +10,7 @@
 with jours as (
     select date as jour, est_jour_ouvre
     from {{ ref('dim_date') }}
-    where dans_exercice
+    where dans_exercice and date <= {{ date_arrete() }}
 ),
 
 credits as (

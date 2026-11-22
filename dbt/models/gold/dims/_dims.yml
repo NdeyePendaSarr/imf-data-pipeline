@@ -252,6 +252,16 @@ models:
           - accepted_values:
               arguments:
                 values: [EN_COURS, SOLDE]
+      - name: statut_a_l_arrete
+        data_type: text
+        description: >
+          EN_COURS ou SOLDE à la date d'arrêté, déduit du capital remboursé jusqu'à l'arrêté (même
+          règle que fct_portefeuille_quotidien). À utiliser pour toute analyse à date.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [EN_COURS, SOLDE]
 
   - name: dim_compte_comptable
     description: >

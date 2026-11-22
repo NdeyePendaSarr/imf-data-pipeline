@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS bronze.meta_catalogue_anomalies (
     id_ligne            TEXT,
     nombre              TEXT,
     traitement_attendu  TEXT,
+    date_ligne          TEXT,
     _id_run             TEXT        NOT NULL,
     _source             TEXT        NOT NULL,
     _num_ligne          INTEGER     NOT NULL,

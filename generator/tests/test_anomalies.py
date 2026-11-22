@@ -179,3 +179,23 @@ def test_chaque_anomalie_n_enfreint_que_sa_regle(petite_generation: Generation) 
         assert (avant, incoherent) == (
             (True, False) if nature == "DATE_INCOHERENTE" else (False, True)
         ), (nature, r)
+
+
+def test_date_ligne_du_catalogue(petite_generation: Generation) -> None:
+    """date_ligne = date de l'événement visé (opération, charge) ; date_maj pour les
+    remboursements ajoutés (imf_ops), date d'adhésion pour les clients."""
+    b = petite_generation.brut
+    dates: dict[tuple[str, str], set[object]] = {}
+    for o in b.operations:
+        dates.setdefault(("operations", o.id_operation), set()).add(o.date_operation)
+    for c in b.charges:
+        dates.setdefault(("charges", c.id_charge), set()).add(c.date_charge)
+    for r in b.remboursements:
+        dates.setdefault(("remboursements", r.id_remboursement), set()).add(r.date_maj.date())
+    for cl in b.clients:
+        dates.setdefault(("clients", cl.id_client), set()).add(cl.date_adhesion)
+    for ligne in b.catalogue:
+        assert dates[ligne.table, ligne.id_ligne] == {ligne.date_ligne}, ligne
+    # Le CSV porte la colonne, au format ISO.
+    lignes = lire_csv(petite_generation.config.sortie / "catalogue_anomalies.csv")
+    assert all(len(ligne["date_ligne"]) == 10 for ligne in lignes)

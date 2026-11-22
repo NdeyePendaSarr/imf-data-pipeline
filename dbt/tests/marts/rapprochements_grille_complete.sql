@@ -1,8 +1,9 @@
--- Grille complète des rapprochements : 12 fins de mois × agences ayant des clients × 2 contrôles
+-- Grille complète des rapprochements : fins de mois jusqu'au mois de l'arrêté (12 au 31/12) × agences ayant des clients × 2 contrôles
 -- (DEPOTS, CREDITS), sans ligne en plus ni en moins (120 lignes pour 5 agences).
 with attendu as (
     select
-        (select count(*) from {{ ref('dim_date') }} where dans_exercice and est_fin_de_mois)
+        (select count(*) from {{ ref('dim_date') }} where dans_exercice and est_fin_de_mois
+            and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }}))
         * (select count(distinct id_agence) from {{ ref('dim_client') }})
         * 2 as nb
 ),

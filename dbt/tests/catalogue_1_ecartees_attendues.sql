@@ -8,6 +8,8 @@ with attendu as (
         case when nature = 'DOUBLON_EXACT' then nombre else 1 end as nb_attendu
     from {{ ref('stg_catalogue_anomalies') }}
     where traitement_attendu in ('REJETER', 'DEDOUBLONNER')
+        -- Seules les anomalies visant une ligne datée au plus tard à l'arrêté.
+        and date_ligne <= {{ date_arrete() }}
 ),
 
 obtenu as (

@@ -296,6 +296,40 @@ Résultats sur l'exercice par défaut :
 | Lignes des marts | balance 879, compte de résultat 48, bilan 72, rapprochements 120, KPI 5 283 |
 | `dbt build` | 432 PASS, 0 WARN, 0 ERROR (371 tests de données, 10 tests unitaires, dont les cas chiffrés calculés à la main de `docs/cadrage/P1_cas_chiffres_tests.md`) |
 
+## Arrêté intermédiaire
+
+Le gold et les marts se calculent à une date d'arrêté (variable dbt `date_arrete`, par défaut le
+31/12 de l'exercice) :
+
+```bash
+make ingest-range DU=2025-01-01 AU=2025-03-31
+uv run --env-file .env dbt build --project-dir dbt --profiles-dir dbt --vars '{date_arrete: "2025-03-15"}'
+```
+
+- **Aucune date postérieure à l'arrêté** dans le gold (test `gold_aucune_date_apres_arrete`), sauf,
+  par nature, le calendrier `dim_date` et les dates prévues des échéances futures
+  (`fct_echeances.date_prevue`). Un test bloquant vérifie que le bronze est ingéré au moins
+  jusqu'à l'arrêté.
+- **Mois partiel** : les marts mensuels vont jusqu'au mois de l'arrêté inclus ; la colonne
+  `date_situation` = la fin de mois, ou la date d'arrêté pour le mois en cours (au 15/03 : mars
+  à la date du 15/03). Vérifié aux arrêtés du 15/01, du 15/03 et du 31/03 : bilan équilibré,
+  rapprochements à 0.
+- **Tests ramenés à l'arrêté** (aucun n'a eu besoin d'un tag de fin d'exercice) :
+  `catalogue_1_ecartees_attendues`, `catalogue_3_standardiser`, `catalogue_4_accepter_null`
+  (anomalies dont la ligne est datée au plus tard à l'arrêté, colonne `date_ligne` du
+  catalogue) ; `portefeuille_fins_de_mois`, `portefeuille_31_08_et_30_11` ;
+  `balance_cloture_a_l_arrete`, `compte_resultat_cumul_a_l_arrete` (dernier mois présent =
+  écritures jusqu'à l'arrêté) ; `rapprochements_grille_complete` ;
+  `kpi_a_l_arrete_egal_portefeuille` (avec une garde contre une comparaison vide) ;
+  `ecritures_dans_exercice`, `ecritures_completude`, `ecritures_montants_par_type`. Les tests
+  unitaires fixent leur propre arrêté : ils testent une logique, pas une date.
+- **Statut à l'arrêté** : `dim_credit.statut_a_l_arrete` (EN_COURS ou SOLDE selon le capital
+  remboursé jusqu'à l'arrêté) ; égal à `statut_au_31_12` à l'arrêté par défaut (test). Au 31/03,
+  75 crédits sont EN_COURS alors que `statut_au_31_12` les dit déjà SOLDE.
+- **Limite (I10)** : la base opérationnelle simulée ne garde que l'état au 31/12 ;
+  `statut_au_31_12` est connu dès le décaissement et ne sert à aucun calcul. Les tests pytest de
+  vérité ne valent qu'à l'arrêté par défaut (la vérité porte sur l'exercice complet).
+
 ## Structure actuelle
 
 ```

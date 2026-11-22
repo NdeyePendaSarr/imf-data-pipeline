@@ -3,6 +3,7 @@
 {%- set annee = var('exercice') %}
 select attendu.date
 from (values (cast('{{ annee }}-08-31' as date)), (cast('{{ annee }}-11-30' as date))) as attendu (date)
-where not exists (
+where attendu.date <= {{ date_arrete() }}  -- seulement si la date est passée à l'arrêté
+and not exists (
     select 1 from {{ ref('fct_portefeuille_quotidien') }} as p where p.date = attendu.date
 )

@@ -20,6 +20,8 @@ unit_tests:
     overrides:
       vars:
         version_mapping: v0.5
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('int_evenements_comptables')
         rows:

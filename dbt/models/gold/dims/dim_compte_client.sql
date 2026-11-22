@@ -6,3 +6,4 @@ select
     statut,
     date_ouverture
 from {{ ref('slv_comptes') }}
+where date_ouverture <= {{ date_arrete() }}

@@ -63,6 +63,10 @@ models:
         data_type: bigint
         description: Solde créditeur en fin de mois (0 si le solde est débiteur).
         data_tests: [not_null]
+      - name: date_situation
+        data_type: date
+        description: Date de situation des montants — fin de mois, ou date d'arrêté pour le mois en cours (arrêté intermédiaire).
+        data_tests: [not_null]
 
   - name: mart_compte_resultat
     description: >
@@ -112,6 +116,10 @@ models:
         data_type: bigint
         description: Contribution cumulée au résultat depuis le 01/01.
         data_tests: [not_null]
+      - name: date_situation
+        data_type: date
+        description: Date de situation des montants — fin de mois, ou date d'arrêté pour le mois en cours (arrêté intermédiaire).
+        data_tests: [not_null]
 
   - name: mart_bilan
     description: >
@@ -153,6 +161,10 @@ models:
       - name: montant
         data_type: bigint
         description: Montant de la rubrique en XOF (actif D − C, passif C − D ; résultat négatif si perte).
+        data_tests: [not_null]
+      - name: date_situation
+        data_type: date
+        description: Date de situation des montants — fin de mois, ou date d'arrêté pour le mois en cours (arrêté intermédiaire).
         data_tests: [not_null]
 
   - name: mart_rapprochements
@@ -202,6 +214,10 @@ models:
       - name: ecart
         data_type: bigint
         description: valeur_gestion − valeur_compta (attendu 0).
+        data_tests: [not_null]
+      - name: date_situation
+        data_type: date
+        description: Date de situation des montants — fin de mois, ou date d'arrêté pour le mois en cours (arrêté intermédiaire).
         data_tests: [not_null]
 
   - name: mart_kpi_portefeuille

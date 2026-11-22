@@ -12,7 +12,9 @@
 with fins_de_mois as (
     select date as date_fin_mois
     from {{ ref('dim_date') }}
+    -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
+        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
 ),
 
 comptes as (
@@ -107,5 +109,6 @@ select
     ) as integer) as ordre,
     cast(cote as text) as cote,
     cast(rubrique as text) as rubrique,
-    cast(montant as bigint) as montant
+    cast(montant as bigint) as montant,
+    cast(least(date_fin_mois, {{ date_arrete() }}) as date) as date_situation
 from postes

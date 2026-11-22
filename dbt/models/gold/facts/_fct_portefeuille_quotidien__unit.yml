@@ -16,6 +16,10 @@ unit_tests:
       PAR 30) sur un crédit impayé ; sur un crédit dont l'échéance 1 est payée, le retard part
       de l'échéance 2 (FIFO).
     model: fct_portefeuille_quotidien
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:

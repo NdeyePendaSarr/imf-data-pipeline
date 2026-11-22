@@ -10,7 +10,9 @@
 with evenements as (
     select e.*
     from {{ ref('int_evenements_comptables') }} as e
-    where not exists (
+    -- Aucun événement postérieur à la date d'arrêté.
+    where e.date_evenement <= {{ date_arrete() }}
+    and not exists (
         select 1 from {{ ref('int_evenements_rejetes') }} as r
         where r.source_table = e.source_table
             and r.source_id = e.source_id

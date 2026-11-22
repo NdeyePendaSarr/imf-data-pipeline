@@ -12,7 +12,7 @@
 --   encours, encours_par30 (retard > 30 jours), nb_credits_actifs : fct_portefeuille_quotidien.
 
 with jours as (
-    select date as jour from {{ ref('dim_date') }} where dans_exercice
+    select date as jour from {{ ref('dim_date') }} where dans_exercice and date <= {{ date_arrete() }}
 ),
 
 credits as (

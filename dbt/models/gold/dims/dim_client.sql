@@ -1,6 +1,7 @@
--- Clients, SCD 1 (un état par client). Âge et tranche d'âge calculés au 31/12 de l'exercice,
--- jamais à la date du jour (current_date) : le résultat ne dépend pas du jour d'exécution.
-{%- set arrete = "cast('" ~ var('exercice') ~ "-12-31' as date)" %}
+-- Clients, SCD 1 (un état par client). Âge et tranche d'âge calculés à la date d'arrêté (macro
+-- date_arrete, défaut : 31/12 de l'exercice), jamais à la date du jour (current_date) : le
+-- résultat ne dépend pas du jour d'exécution.
+{%- set arrete = date_arrete() %}
 
 with clients as (
     select
@@ -10,6 +11,7 @@ with clients as (
                 then cast(extract(year from age({{ arrete }}, date_naissance)) as integer)
         end as age_au_31_12
     from {{ ref('slv_clients') }}
+    where date_adhesion <= {{ date_arrete() }}
 )
 
 select

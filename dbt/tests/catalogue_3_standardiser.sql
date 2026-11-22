@@ -4,6 +4,7 @@ from {{ ref('stg_catalogue_anomalies') }} as c
 left join {{ ref('slv_operations') }} as o on o.id_operation = c.id_ligne
 where c.table_source = 'operations'
     and c.traitement_attendu = 'STANDARDISER'
+    and c.date_ligne <= {{ date_arrete() }}
     and (
         o.id_operation is null
         or not exists (

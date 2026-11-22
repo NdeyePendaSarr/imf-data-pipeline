@@ -12,6 +12,10 @@ unit_tests:
       liaison agents (solde créditeur de 50 000) est reclassée en P3_DETTES_TRESORERIE (H8) :
       trésorerie 950 000 et non 900 000 ; total 1 200 000.
     model: mart_bilan
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:
@@ -83,6 +87,10 @@ unit_tests:
       jamais A2 + 30 000 et P3 + 50 000 (somme des soldes d'agence). Caisse 60 000 à AG_B.
       Actif 60 000 = P2 40 000 + P3 20 000.
     model: mart_bilan
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:
@@ -124,6 +132,10 @@ unit_tests:
       Section 5 du cas chiffré : CREDITS 275 000 / 250 000 et DEPOTS 314 000 / 234 000, gestion =
       compta, écart 0 au 31/01 et au 28/02.
     model: mart_rapprochements
+    overrides:
+      vars:
+        # Indépendant de l'arrêté du run : ce test vérifie la logique, pas une date.
+        date_arrete: "2025-12-31"
     given:
       - input: ref('dim_date')
         rows:

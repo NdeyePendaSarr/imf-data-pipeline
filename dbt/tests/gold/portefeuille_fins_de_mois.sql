@@ -3,7 +3,7 @@
 select f.date as fin_de_mois
 from {{ ref('dim_date') }} as f
 left join {{ ref('fct_portefeuille_quotidien') }} as p on p.date = f.date
-where f.dans_exercice and f.est_fin_de_mois and f.date >= (
+where f.dans_exercice and f.est_fin_de_mois and f.date <= {{ date_arrete() }} and f.date >= (
     select min(date) from {{ ref('fct_portefeuille_quotidien') }}
 )
 group by f.date

@@ -2,3 +2,4 @@
 select id_ecriture, date_ecriture
 from {{ ref('fct_ecritures') }}
 where extract(year from date_ecriture) <> {{ var('exercice') }}
+    or date_ecriture > {{ date_arrete() }}

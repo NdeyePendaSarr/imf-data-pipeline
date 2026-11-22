@@ -76,7 +76,7 @@ INSTANTANES: tuple[ObjetCsv, ...] = (
     ObjetCsv(
         "catalogue_anomalies",
         "meta_catalogue_anomalies",
-        ("nature", "table", "id_ligne", "nombre", "traitement_attendu"),
+        ("nature", "table", "id_ligne", "nombre", "traitement_attendu", "date_ligne"),
         SOURCE_META,
         False,
     ),
