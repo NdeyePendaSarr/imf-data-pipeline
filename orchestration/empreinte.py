@@ -24,8 +24,12 @@ from ingestion.config import parametres_connexion
 
 SCHEMA = "gold"
 NB_TABLES = 19
-# MD5 de la chaîne vide : table vide (string_agg sur zéro ligne).
+# MD5 de la chaîne vide (string_agg sur zéro ligne) : jamais écrit tel quel.
 MD5_VIDE = "d41d8cd98f00b204e9800998ecf8427e"
+# Empreinte notée pour une table légitimement vide (ex. mart_kpi_portefeuille avant la première
+# fin de mois) : acceptée, contrairement à une empreinte absente ou mal formée.
+VIDE = "VIDE"
+CHIFFRES_HEXA = frozenset("0123456789abcdef")
 
 
 class ErreurEmpreinte(Exception):
@@ -55,17 +59,28 @@ def calculer(conn: psycopg.Connection[Any]) -> list[Empreinte]:
         ).format(sql.Identifier(SCHEMA, table))
         resultat = conn.execute(requete).fetchone()
         assert resultat is not None
-        empreintes.append(Empreinte(table, int(resultat[0]), resultat[1] or ""))
+        lignes = int(resultat[0])
+        empreintes.append(Empreinte(table, lignes, VIDE if lignes == 0 else resultat[1] or ""))
     return empreintes
 
 
+def _md5_valide(md5: str) -> bool:
+    return len(md5) == 32 and set(md5) <= CHIFFRES_HEXA and md5 != MD5_VIDE
+
+
 def valider(empreintes: list[Empreinte]) -> None:
-    """Exactement 19 tables, aucune empreinte vide."""
+    """Exactement 19 tables ; table vide notée VIDE, sinon un MD5 de 32 caractères hexa.
+
+    Refusé (sortie cassée) : empreinte absente ou mal formée, VIDE sur une table qui a des
+    lignes, MD5 de la chaîne vide, ou MD5 sur une table annoncée à 0 ligne.
+    """
     if len(empreintes) != NB_TABLES:
         raise ErreurEmpreinte(f"{len(empreintes)} table(s) gold au lieu de {NB_TABLES}")
-    vides = [e.table for e in empreintes if not e.md5 or e.md5 == MD5_VIDE or e.lignes == 0]
-    if vides:
-        raise ErreurEmpreinte(f"empreinte vide : {', '.join(vides)}")
+    cassees = [
+        e.table for e in empreintes if not (e.md5 == VIDE if e.lignes == 0 else _md5_valide(e.md5))
+    ]
+    if cassees:
+        raise ErreurEmpreinte(f"empreinte cassée : {', '.join(cassees)}")
 
 
 def ecrire(empreintes: list[Empreinte], fichier: Path) -> None:
@@ -115,7 +130,9 @@ def main(arguments: list[str] | None = None) -> int:
                 empreintes = calculer(conn)
             valider(empreintes)
             ecrire(empreintes, args.fichier)
-            print(f"{len(empreintes)} tables gold → {args.fichier}")
+            vides = [e.table for e in empreintes if e.md5 == VIDE]
+            note = f" (table(s) vide(s) : {', '.join(vides)})" if vides else ""
+            print(f"{len(empreintes)} tables gold → {args.fichier}{note}")
             return 0
         ecarts = comparer(lire(args.a), lire(args.b))
     except (ErreurEmpreinte, OSError, psycopg.Error) as erreur:

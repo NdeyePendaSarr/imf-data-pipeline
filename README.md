@@ -424,8 +424,10 @@ suivants déjà démarrés : le scheduler reprend dans l'ordre des dates. Inutil
 transitoire, que les retries absorbent.
 
 **Empreinte du gold.** `make empreinte-gold FICHIER=…` écrit le MD5 du contenu trié (toutes
-colonnes) de chacune des 19 tables gold ; elle échoue si le schéma n'a pas 19 tables ou si une
-table est vide. `make compare-empreintes A=… B=…` échoue si deux empreintes diffèrent.
+colonnes) de chacune des 19 tables gold ; une table légitimement vide est notée `VIDE` (à
+l'arrêté du 15/01 : `dim_credit`, les faits crédit et `mart_kpi_portefeuille`, aucun crédit
+n'étant encore décaissé). Elle échoue si le schéma n'a pas 19 tables ou si une empreinte est
+cassée (absente, mal formée, ou incohérente avec le nombre de lignes). `make compare-empreintes A=… B=…` échoue si deux empreintes diffèrent.
 
 **Fichier source corrigé.** L'ingestion ne se fie pas au nom du fichier mais à son SHA-256 :
 même empreinte que la dernière chargée → `IGNORE` ; empreinte différente → la partition
@@ -536,10 +538,10 @@ Durée moyenne d'un run par mois (dont `dbt build`) :
 | dbt (s) | 34,7 | 27,0 | 17,8 | 17,4 | 17,9 | 18,3 | 18,7 | 19,3 | 20,1 | 20,8 | 21,7 | 23,8 |
 
 À partir de mars, `dbt build` s'allonge régulièrement avec l'historique (≈ +0,6 s par mois).
-Janvier et février sont plus lents alors que les données y sont moindres : la machine était
-plus chargée pendant la première heure (jusqu'à 277 s pour `dbt debug` dans
-`verifier_environnement` le 05/02, run le plus long, 325 s) ; l'audit ne permet pas d'en dire
-plus.
+Janvier et février sont plus lents alors que les données y sont moindres (jusqu'à 277 s pour
+`dbt debug` dans `verifier_environnement` le 05/02, run le plus long, 325 s) : la première heure
+du backfill (16:15 → ~17:05) a tourné avec l'économiseur d'énergie de Windows actif, désactivé
+ensuite. C'est l'explication probable ; l'audit ne permet pas de la prouver.
 
 ```sql
 -- Statuts des runs du backfill (filtre sur son heure de début)
