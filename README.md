@@ -4,7 +4,7 @@
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
 
-> 🚧 **Projet en construction** — phase 5 terminée, prochaine étape : balances, états financiers, KPI et rapprochements.
+> 🚧 **Projet en construction** — phase 6 terminée, prochaine étape : orchestration Airflow.
 
 ## Objectif
 
@@ -27,8 +27,8 @@ remboursements, charges) en :
 | 3 | Ingestion incrémentale et idempotente (bronze) | ✅ |
 | 4 | Nettoyage et standardisation avec dbt (silver) | ✅ |
 | 5 | Schéma en étoile et écritures comptables (gold) | ✅ |
-| 6 | Balances, états financiers, KPI, rapprochements | 🚧 |
-| 7 | Orchestration Airflow | ⬜ |
+| 6 | Balances, états financiers, KPI, rapprochements | ✅ |
+| 7 | Orchestration Airflow | 🚧 |
 | 8 | Dashboard Power BI | ⬜ |
 | 9 | CI, documentation, entrepôt cloud | ⬜ |
 
@@ -270,6 +270,32 @@ Résultats sur l'exercice par défaut :
 | Lignes des faits | portefeuille quotidien 347 012, échéances 34 037, opérations 66 514, remboursements 11 684, soldes mensuels 14 946 |
 | `dbt build` | 352 PASS, 0 WARN, 0 ERROR (303 tests de données, 3 tests unitaires) |
 
+## Marts (dbt) : états financiers, rapprochements et KPI
+
+- `mart_balance` : balance mensuelle à 6 colonnes (ouverture, mouvements, clôture, au débit et au
+  crédit) par compte × agence ; ouverture de janvier à 0 ; un compte reste présent dès son premier
+  mouvement.
+- `mart_compte_resultat` : rubrique × mois, montant du mois et cumul ; résultat = produits − charges.
+- `mart_bilan` : rubriques × fin de mois au niveau de l'IMF, soldes calculés sur les mouvements de
+  toutes les agences ; un solde inversé (liaison agents ou mobile money créditrice) est reclassé en
+  dette (règle portée par le plan de comptes) ; le résultat cumulé est au passif.
+- `mart_rapprochements` : fin de mois × agence × contrôle, gestion ↔ comptabilité (dépôts des
+  clients ↔ `DEPOTS_EPARGNE`, encours ↔ `CREDITS_SAINS`), avec l'écart.
+- `mart_kpi_portefeuille` : jour × agence × produit ; numérateurs et dénominateurs seulement (encours,
+  encours à plus de 30 jours, dû échu, payé imputé), les ratios sont recalculés à l'affichage.
+
+Résultats sur l'exercice par défaut :
+
+| Contrôle | Résultat |
+|---|---|
+| Bilan au 31/12/2025 | actif = passif + résultat = 2 119 584 054 XOF, chaque fin de mois |
+| Résultat de l'exercice | −333 130 376 XOF (164 015 389 de produits, 497 145 765 de charges), égal à la vérité |
+| PAR 30 au 31/12 | 92 511 316 / 1 850 520 623 XOF = 4,9992 %, égal à la vérité au franc près |
+| Taux de remboursement au 31/12 | 999 172 879 / 1 039 096 786 XOF = 96,16 % (paiements anticipés non comptés) |
+| Rapprochements | 120 lignes (12 mois × 5 agences × 2 contrôles), écart 0 partout |
+| Lignes des marts | balance 879, compte de résultat 48, bilan 72, rapprochements 120, KPI 5 283 |
+| `dbt build` | 432 PASS, 0 WARN, 0 ERROR (371 tests de données, 10 tests unitaires, dont les cas chiffrés calculés à la main de `docs/cadrage/P1_cas_chiffres_tests.md`) |
+
 ## Structure actuelle
 
 ```
@@ -301,8 +327,9 @@ Résultats sur l'exercice par défaut :
 - La base opérationnelle simulée ne conserve que l'état au 31/12 : le statut des crédits n'est pas
   historisé.
 - Pas de comptes de tiers par agent : les liaisons sont classées sur leur solde au niveau de l'IMF
-  (écart chiffré : 16 137 323 XOF au 30/11/2025 entre P3 au niveau de l'IMF et la somme des soldes
-  créditeurs par agence ; 9 590 935 XOF au 31/12/2025).
+  (écart chiffré sur la liaison agents : 13 297 824 XOF au 30/11/2025 entre P3 au niveau de l'IMF
+  et la somme des soldes créditeurs par agence ; 9 590 935 XOF au 31/12/2025). Le mobile money n'a
+  qu'un opérateur : son solde au niveau de l'IMF est le bon.
 - Commissions mobile money de décembre facturées en janvier suivant : hors exercice (pas de charges
   à payer).
 - Remboursements partiels : imputation pénalités → intérêts → capital par échéance ; 243 soldes

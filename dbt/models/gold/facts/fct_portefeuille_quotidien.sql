@@ -58,14 +58,16 @@ credit_jour as (
 ),
 
 retards as (
-    -- Plus ancienne échéance échue avant d et non couverte par le cumul payé à d.
+    -- Plus ancienne échéance échue (date prévue ≤ d, même convention que mart_kpi_portefeuille,
+    -- H11) et non couverte par le cumul payé à d. Une échéance prévue le jour d et impayée donne
+    -- 0 jour de retard : inclure le jour d ne change ni le retard ni le PAR 30.
     select
         cj.id_credit,
         cj.jour,
         min(e.date_echeance) as plus_ancienne_impayee
     from credit_jour as cj
     inner join echeances as e
-        on e.id_credit = cj.id_credit and e.date_echeance < cj.jour and e.cumul_du > cj.cumul_paye
+        on e.id_credit = cj.id_credit and e.date_echeance <= cj.jour and e.cumul_du > cj.cumul_paye
     group by cj.id_credit, cj.jour
 ),
 

@@ -203,3 +203,62 @@ models:
         data_type: bigint
         description: valeur_gestion − valeur_compta (attendu 0).
         data_tests: [not_null]
+
+  - name: mart_kpi_portefeuille
+    description: >
+      KPI du portefeuille (H11) : jour calendaire × agence × produit. Numérateurs et dénominateurs
+      seulement : PAR 30 = encours_par30 / encours ; taux de remboursement = paye_impute_cumule /
+      du_echu_cumule (min par crédit avant agrégation, FIFO G11). Aucun ratio stocké.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [date, id_agence, code_produit]
+    columns:
+      - name: date
+        data_type: date
+        description: Jour calendaire de l'exercice.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date
+      - name: id_agence
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_agence')
+                field: id_agence
+      - name: code_produit
+        data_type: text
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_produit_credit')
+                field: code_produit
+      - name: nb_credits_actifs
+        data_type: integer
+        description: Crédits dont l'encours est > 0 ce jour-là.
+        data_tests: [not_null]
+      - name: encours
+        data_type: bigint
+        description: Σ capital restant dû (fct_portefeuille_quotidien).
+        data_tests: [not_null]
+      - name: encours_par30
+        data_type: bigint
+        description: Σ encours des crédits en retard de plus de 30 jours (numérateur du PAR 30).
+        data_tests: [not_null]
+      - name: du_echu_cumule
+        data_type: bigint
+        description: Σ capital + intérêts des échéances de date prévue ≤ jour, depuis le décaissement.
+        data_tests: [not_null]
+      - name: paye_impute_cumule
+        data_type: bigint
+        description: Σ par crédit de min(cumul payé capital + intérêts, dû échu cumulé) ; pénalités exclues.
+        data_tests: [not_null]

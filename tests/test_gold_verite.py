@@ -120,3 +120,13 @@ def test_compte_de_resultat_egal_verite() -> None:
     produits = attendu["R1_PRODUITS_FINANCIERS"] + attendu["R2_COMMISSIONS"]
     charges = attendu["R3_CHARGES_PERSONNEL"] + attendu["R4_CHARGES_GENERALES"]
     assert sum(int(str(res)) for _, _, res in lignes) == produits - charges
+
+
+def test_kpi_portefeuille_au_31_12_egal_verite() -> None:
+    """mart_kpi_portefeuille au 31/12 : Σ encours et Σ encours_par30 = data/_verite/par30.csv."""
+    (attendu,) = lire("par30")
+    (ligne,) = requete(
+        "SELECT sum(encours), sum(encours_par30) FROM gold.mart_kpi_portefeuille "
+        "WHERE date = (SELECT max(date) FROM gold.dim_date WHERE dans_exercice)"
+    )
+    assert ligne == (int(attendu["encours_total"]), int(attendu["encours_par30"]))

@@ -1,0 +1,45 @@
+version: 2
+
+# Test unitaire de mart_kpi_portefeuille (H11), attendus de la consigne recopiés tels quels.
+# Un crédit, trois échéances de 10 000 XOF (31/03, 30/04, 31/05), paiements de 4 000 le 10/04 et
+# de 26 000 le 20/04 (capital + intérêts, sans pénalité).
+#   15/04 : dû échu 10 000 (31/03), payé 4 000 → imputé 4 000.
+#   30/04 : dû échu 20 000 (31/03 + 30/04, date prévue ≤ jour), payé 30 000 → imputé 20 000 :
+#           le paiement anticipé de l'échéance du 31/05 ne compte pas (min par crédit).
+#   31/05 : dû échu 30 000, payé 30 000 → imputé 30 000.
+
+unit_tests:
+  - name: mart_kpi_portefeuille_paiement_anticipe
+    description: >
+      Taux de remboursement FIFO : paye_impute_cumule = min(cumul payé, dû échu cumulé) par
+      crédit ; le paiement anticipé du 20/04 n'est imputé qu'à l'échéance du 31/05.
+    model: mart_kpi_portefeuille
+    given:
+      - input: ref('dim_date')
+        rows:
+          - {date: 2025-04-15, dans_exercice: true}
+          - {date: 2025-04-30, dans_exercice: true}
+          - {date: 2025-05-31, dans_exercice: true}
+      - input: ref('dim_credit')
+        rows:
+          - {id_credit: CRD_KPI, id_client: CLI_TEST, code_produit: AGR, date_decaissement: 2025-02-28}
+      - input: ref('dim_client')
+        rows:
+          - {id_client: CLI_TEST, id_agence: AG_TEST}
+      - input: ref('fct_echeances')
+        rows:
+          - {id_credit: CRD_KPI, num_echeance: 1, date_prevue: 2025-03-31, capital_du: 10000, interets_dus: 0}
+          - {id_credit: CRD_KPI, num_echeance: 2, date_prevue: 2025-04-30, capital_du: 10000, interets_dus: 0}
+          - {id_credit: CRD_KPI, num_echeance: 3, date_prevue: 2025-05-31, capital_du: 10000, interets_dus: 0}
+      - input: ref('fct_remboursements')
+        rows:
+          - {id_remboursement: RMB_1, id_credit: CRD_KPI, date_remboursement: 2025-04-10, part_capital: 4000, part_interets: 0, penalites: 0, montant_paye: 4000}
+          - {id_remboursement: RMB_2, id_credit: CRD_KPI, date_remboursement: 2025-04-20, part_capital: 26000, part_interets: 0, penalites: 0, montant_paye: 26000}
+      - input: ref('fct_portefeuille_quotidien')
+        rows:
+          - {date: 2025-04-15, id_credit: CRD_KPI, encours: 26000, jours_retard: 15}
+    expect:
+      rows:
+        - {date: 2025-04-15, id_agence: AG_TEST, code_produit: AGR, du_echu_cumule: 10000, paye_impute_cumule: 4000}
+        - {date: 2025-04-30, id_agence: AG_TEST, code_produit: AGR, du_echu_cumule: 20000, paye_impute_cumule: 20000}
+        - {date: 2025-05-31, id_agence: AG_TEST, code_produit: AGR, du_echu_cumule: 30000, paye_impute_cumule: 30000}
