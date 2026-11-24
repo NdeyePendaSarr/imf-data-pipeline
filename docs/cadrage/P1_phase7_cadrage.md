@@ -12,7 +12,7 @@
 | J2 | Variable dbt `date_arrete` (défaut = fin d'exercice), macro `date_arrete()` ; Airflow passe `{{ ds }}` ; test `gold_aucune_date_apres_arrete` (hors `dim_date`, `fct_echeances.date_prevue`) | Le gold ne montre que ce qui est connu à J |
 | J3 | Test bloquant `bronze_ingere_jusqu_a_l_arrete` | Pas de gold « au 15/03 » sur un bronze au 10/03 |
 | J4 | 12 tests ramenés à l'arrêté ; aucun tag `fin_exercice` | Pas de test désactivé |
-| J5 | Vérité (pytest) hors DAG, dans `make check` | Pas d'oracle en production |
+| J5 | Vérité (pytest) hors DAG, dans `make check` | Pas d'oracle dans les runs quotidiens |
 | J6 | Airflow **3.3.2** épinglé (3.4.0 sortie le 06/11/2026, écartée : version .0 récente), LocalExecutor, parallelism 2, airflow-db séparée, sans triggerer, `mem_limit` par service, profil compose `airflow`, auth FAB | RAM 7,6 Go ; environnement de dev inchangé ; version de maintenance plutôt qu'une .0 |
 | J7 | Image `airflow/Dockerfile` (4,28 Go) : env Airflow sans dbt + venv `/opt/pipeline-venv` (`uv sync --frozen`) sans Airflow ; dépôt monté **en lecture seule**, seul `data/` en écriture ; artefacts dbt dans le conteneur ; `PYTHONDONTWRITEBYTECODE=1` | Conflit de dépendances ; le conteneur ne peut pas modifier le code ni `.env` |
 | J8 | `@daily`, exercice, `max_active_runs=1`, `depends_on_past=True`, backfill Airflow 3 ; run sans logical_date refusé | Filigrane cumulatif ; pas de J+1 sur un J en échec |

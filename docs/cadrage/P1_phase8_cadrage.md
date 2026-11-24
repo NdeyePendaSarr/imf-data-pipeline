@@ -1,6 +1,6 @@
 # P1 – Phase 8 : dashboard Power BI — cadrage (v0.3, 24/11/2026) – PHASE TERMINÉE
 
-> Version publique. Complète la PRD v1.7 (§9, phase 8). Décisions K1 à K14.
+> Version publique. Complète la PRD v1.7 (§9, phase 8) ; les écarts sont reportés dans la **PRD v1.8**. Décisions K1 à K14.
 > v0.2 : étape 1 terminée ; K3, K5, K2 corrigés ; K12 et K13 ajoutés.
 > v0.3 : K10 tranché (.pbix) ; K14 (libellés des rubriques) ajouté ; étapes 1 bis à 5 terminées avec leurs chiffres ; nouveaux compteurs de tests.
 

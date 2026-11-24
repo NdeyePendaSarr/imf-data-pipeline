@@ -1,6 +1,6 @@
 # P1 – Phase 9 : industrialisation et cloud — cadrage (v0.14, 24/11/2026) – PHASE TERMINÉE
 
-> Version publique. Complète le PRD (§8.4, §9) ; les écarts au PRD sont reportés en **v1.8**.
+> Version publique. Complète le PRD (§8.4, §9) ; les écarts au PRD sont reportés en **v1.9**.
 > Critère de fin (PRD §9) : CI verte, `dbt build` vert sur PostgreSQL **et** sur BigQuery, README
 > complet, schéma d'architecture, docs dbt.
 
@@ -39,4 +39,4 @@ Hors périmètre : Airflow sur BigQuery ; DagBag dans la CI ; run du DAG en phas
 | 3a–3d. Portage BigQuery | Chargeur, profil, silver, gold | Build bq complet vert ; L3 sans écart au 31/12 et au 15/03 | ✅ (`af40f42`) : 457 PASS sur bq et dev |
 | 4a. Rebuild et preuve versionnée | `make rebuild-bq`, `make compare-moteurs` | Entrepôt recréé en une commande, 0 écart | ✅ (`af40f42`) : 4 min 28 s à 5 min 07 s en local |
 | 4b. Job CI BigQuery | `bigquery.yml`, fédération d'identité | Run manuel vert sur `main` sans clé JSON, 0 écart | ✅ : premier run 45393283643 en échec (audit absent de la CI) → correctif L15 `b705301` → **run 45396166776 vert, 351 s** (authentification 0 s ; generate 5 s ; ingest 6 s ; dbt dev 19 s ; `rebuild-bq SANS_AUDIT=1` 290 s : 14 tables en 64,5 s, 457 PASS, **71 mesures, 0 écart**) ; audit BigQuery toujours à 3 201 lignes ; `make check` 457 PASS, **227 pytest** |
-| 5. Livraison (lot C) | README, Mermaid, docs dbt (Pages), PRD v1.8 et cadrage public | CI verte, docs en ligne, badges verts | ✅ |
+| 5. Livraison (lot C) | README, Mermaid, docs dbt (Pages), PRD v1.9 et cadrage public | CI verte, docs en ligne, badges verts | ✅ |
