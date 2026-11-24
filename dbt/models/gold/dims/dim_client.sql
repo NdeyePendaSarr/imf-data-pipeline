@@ -8,7 +8,7 @@ with clients as (
         *,
         case
             when date_naissance is not null
-                then cast(extract(year from age({{ arrete }}, date_naissance)) as integer)
+                then cast({{ age_revolu(arrete, 'date_naissance') }} as integer)
         end as age_au_31_12
     from {{ ref('slv_clients') }}
     where date_adhesion <= {{ date_arrete() }}
@@ -28,8 +28,8 @@ select
         when age_au_31_12 < 56 then '46-55'
         when age_au_31_12 < 66 then '56-65'
         else '66+'
-    end as text) as tranche_age,
+    end as {{ dbt.type_string() }}) as tranche_age,
     -- NULL accepté en silver (ACCEPTER_NULL), libellé explicite en gold.
-    cast(coalesce(secteur_activite, 'NON_RENSEIGNE') as text) as secteur_activite,
+    cast(coalesce(secteur_activite, 'NON_RENSEIGNE') as {{ dbt.type_string() }}) as secteur_activite,
     date_adhesion
 from clients

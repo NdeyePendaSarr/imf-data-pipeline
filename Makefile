@@ -2,9 +2,14 @@
 # Chaque cible documentée par « ## » apparaît dans `make help`.
 
 .DEFAULT_GOAL := help
+
+# .env lu par uv seulement s'il existe : en CI, pas de .env, les variables viennent de
+# l'environnement du job (POSTGRES_*, BQ_*).
+ENV_FILE := $(if $(wildcard .env),--env-file .env,)
+
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
-	ingest ingest-range ingest-all reset-bronze \
-	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes powerbi-role test-airflow \
+	ingest ingest-range ingest-all load-bq reset-bronze \
+	dbt-deps dbt-build test-verite compare-moteurs rebuild-bq airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes powerbi-role test-airflow \
 	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
@@ -51,13 +56,16 @@ ingest-range: ## Ingère une période jour par jour : make ingest-range DU=… A
 ingest-all: ## Ingère tous les jours de l'exercice (rattrapage complet)
 	uv run python -m ingestion --exercice
 
+load-bq: ## Copie le bronze et audit_runs vers BigQuery (BQ_PROJECT, BQ_LOCATION du .env)
+	uv run $(ENV_FILE) python -m ingestion.charger_bq
+
 reset-bronze: ## SUPPRIME le schéma bronze de imf_dwh puis le recrée vide
 	@echo "⚠️  ATTENTION : reset-bronze supprime toutes les données du schéma bronze (imf_dwh)."
 	docker compose exec -T postgres sh -c 'psql -U "$$POSTGRES_USER" -d imf_dwh -v ON_ERROR_STOP=1 \
 		-c "DROP SCHEMA IF EXISTS bronze CASCADE" -c "CREATE SCHEMA bronze"'
 
-# dbt lit le .env via uv (profiles.yml : uniquement env_var()).
-DBT = uv run --env-file .env dbt
+# dbt lit le .env via uv quand il existe (profiles.yml : uniquement env_var()).
+DBT = uv run $(ENV_FILE) dbt
 DBT_OPTIONS = --project-dir dbt --profiles-dir dbt
 
 dbt-deps: ## Installe les packages dbt (dbt_utils)
@@ -69,6 +77,16 @@ dbt-build: ## Seeds + modèles silver + tests dbt (prérequis : make ingest-all)
 
 test-verite: ## Compare chaque slv_* à data/_verite/ (prérequis : make ingest-all dbt-build)
 	uv run pytest tests/test_silver_verite.py
+
+# BigQuery (phase 9) : même projet dbt, cible bq (profiles.yml), datasets en BQ_LOCATION.
+compare-moteurs: ## Compare gold et silver PostgreSQL / BigQuery (L3) ; échec au moindre écart
+	uv run $(ENV_FILE) python -m scripts.comparer_moteurs
+
+rebuild-bq: ## Recharge le bronze dans BigQuery, dbt build --target bq, puis compare-moteurs
+	@test -d dbt/dbt_packages/dbt_utils || $(MAKE) dbt-deps
+	$(MAKE) load-bq
+	$(DBT) build $(DBT_OPTIONS) --target bq
+	$(MAKE) compare-moteurs
 
 # Airflow (phase 7) : profil « airflow » du docker-compose, secrets lus dans .env.
 AIRFLOW = docker compose --profile airflow
@@ -97,7 +115,7 @@ compare-empreintes: ## Compare deux empreintes gold (échec si différentes) : A
 
 # Power BI (phase 8) : rôle de lecture, mot de passe POWERBI_PASSWORD lu dans .env par uv.
 powerbi-role: ## Crée ou met à jour le rôle powerbi_lecteur (SELECT sur gold et audit)
-	@uv run --no-sync --env-file .env sh -c 'test -n "$$POWERBI_PASSWORD" || \
+	@uv run --no-sync $(ENV_FILE) sh -c 'test -n "$$POWERBI_PASSWORD" || \
 		{ echo "POWERBI_PASSWORD absent ou vide dans .env" >&2; exit 2; }; \
 		docker compose exec -T -e POWERBI_PASSWORD postgres psql -U "$$POSTGRES_USER" \
 		-d "$${POSTGRES_DB_DWH:-imf_dwh}" -v ON_ERROR_STOP=1 -q -f - < dashboard/sql/role_lecture.sql'

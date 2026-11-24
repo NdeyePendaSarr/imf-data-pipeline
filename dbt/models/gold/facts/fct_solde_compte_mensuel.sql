@@ -7,7 +7,7 @@ with fins_de_mois as (
     from {{ ref('dim_date') }}
     -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
-        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
+        and {{ dbt.date_trunc('month', 'date') }} <= {{ dbt.date_trunc('month', date_arrete()) }}
 ),
 
 comptes as (
@@ -17,7 +17,7 @@ comptes as (
 ),
 
 mouvements_par_mois as (
-    select id_compte, (date_trunc('month', date) + interval '1 month - 1 day')::date as date_fin_mois,
+    select id_compte, {{ dbt.last_day('date', 'month') }} as date_fin_mois,
         sum(montant_signe) as mouvement
     from {{ ref('int_mouvements_compte') }}
     where date <= {{ date_arrete() }}
@@ -26,10 +26,10 @@ mouvements_par_mois as (
 
 select
     cast(f.date_fin_mois as date) as date_fin_mois,
-    cast(c.id_compte as text) as id_compte,
-    cast(c.id_client as text) as id_client,
-    cast(c.id_agence as text) as id_agence,
-    cast(c.type_compte as text) as type_compte,
+    cast(c.id_compte as {{ dbt.type_string() }}) as id_compte,
+    cast(c.id_client as {{ dbt.type_string() }}) as id_client,
+    cast(c.id_agence as {{ dbt.type_string() }}) as id_agence,
+    cast(c.type_compte as {{ dbt.type_string() }}) as type_compte,
     cast(coalesce(sum(m.mouvement), 0) as bigint) as solde,
     cast(least(f.date_fin_mois, {{ date_arrete() }}) as date) as date_situation
 from comptes as c

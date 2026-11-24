@@ -5,14 +5,13 @@
 with classement as (
     -- Sens de chaque rubrique du compte de résultat. R5_COUT_DU_RISQUE est volontairement mixte :
     -- dotations (charge) et reprises (produit) s'y compensent pour donner le coût du risque net.
-    select * from (values
-        ('R1_PRODUITS_FINANCIERS', 'PRODUIT'),
-        ('R2_COMMISSIONS', 'PRODUIT'),
-        ('R3_CHARGES_PERSONNEL', 'CHARGE'),
-        ('R4_CHARGES_GENERALES', 'CHARGE'),
-        ('R5_COUT_DU_RISQUE', 'MIXTE'),
-        ('R6_CHARGES_FINANCIERES', 'CHARGE')
-    ) as c (rubrique, sens_rubrique)
+    -- union all de select : SQL standard ((values …) as c (…) n'existe pas en BigQuery).
+    select 'R1_PRODUITS_FINANCIERS' as rubrique, 'PRODUIT' as sens_rubrique
+    union all select 'R2_COMMISSIONS', 'PRODUIT'
+    union all select 'R3_CHARGES_PERSONNEL', 'CHARGE'
+    union all select 'R4_CHARGES_GENERALES', 'CHARGE'
+    union all select 'R5_COUT_DU_RISQUE', 'MIXTE'
+    union all select 'R6_CHARGES_FINANCIERES', 'CHARGE'
 )
 
 select comptes.code_compte, comptes.nature, comptes.etat, comptes.rubrique, classement.sens_rubrique

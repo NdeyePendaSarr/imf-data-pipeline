@@ -34,7 +34,13 @@ select
     derniere.*,
     -- Un seul motif par ligne, par ordre de priorité (S6).
     case
-        when least(montant_paye, part_capital, part_interets, penalites) < 0 then 'MONTANT_NEGATIF'
+        -- least : PostgreSQL ignore les NULL, BigQuery renvoie NULL dès qu'un argument est NULL
+        -- (un montant négatif à côté d'une part NULL passerait inaperçu). coalesce(…, 0) rend le
+        -- même résultat sur les deux moteurs : 0 n'est jamais < 0.
+        when least(
+            coalesce(montant_paye, 0), coalesce(part_capital, 0),
+            coalesce(part_interets, 0), coalesce(penalites, 0)
+        ) < 0 then 'MONTANT_NEGATIF'
         when not exists (
             select 1 from {{ ref('canaux_autorises') }} as a
             where a.source = 'remboursements' and a.canal = derniere.canal

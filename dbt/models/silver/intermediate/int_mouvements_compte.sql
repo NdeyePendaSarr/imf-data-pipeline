@@ -63,11 +63,11 @@ mouvements as (
 
 select
     -- Identifiant déterministe et lisible : type du mouvement + identifiant de la ligne source.
-    cast(type_mouvement || ':' || source_id as text) as id_mouvement,
-    cast(id_compte as text) as id_compte,
+    cast(type_mouvement || ':' || source_id as {{ dbt.type_string() }}) as id_mouvement,
+    cast(id_compte as {{ dbt.type_string() }}) as id_compte,
     cast(date as date) as date,
-    cast(type_mouvement as text) as type_mouvement,
+    cast(type_mouvement as {{ dbt.type_string() }}) as type_mouvement,
     cast(montant_signe as bigint) as montant_signe,
-    cast(source_table as text) as source_table,
-    cast(source_id as text) as source_id
+    cast(source_table as {{ dbt.type_string() }}) as source_table,
+    cast(source_id as {{ dbt.type_string() }}) as source_id
 from mouvements

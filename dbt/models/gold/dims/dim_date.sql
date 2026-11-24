@@ -15,14 +15,15 @@ select
     cast(date_day as date) as date,
     cast(extract(year from date_day) as integer) as annee,
     cast(extract(month from date_day) as integer) as mois,
-    cast(to_char(date_day, 'YYYY-MM') as text) as annee_mois,
+    cast({{ annee_mois('cast(date_day as date)') }} as {{ dbt.type_string() }}) as annee_mois,
     cast(extract(quarter from date_day) as integer) as trimestre,
-    cast(extract(isodow from date_day) as integer) as jour_semaine,
+    -- Jour ISO (1 = lundi … 7 = dimanche) : macro jour_iso, jamais DAYOFWEEK en BigQuery.
+    cast({{ jour_iso('cast(date_day as date)') }} as integer) as jour_semaine,
     -- Exercice comptable de la date (année civile) et appartenance à l'exercice analysé.
     cast(extract(year from date_day) as integer) as exercice,
     cast(extract(year from date_day) = {{ var('exercice') }} as boolean) as dans_exercice,
-    cast(date_day = (date_trunc('month', date_day) + interval '1 month - 1 day')::date as boolean)
+    cast(cast(date_day as date) = {{ dbt.last_day('date_day', 'month') }} as boolean)
         as est_fin_de_mois,
     -- Guichet et agents : lundi à samedi, sans jours fériés (Limites).
-    cast(extract(isodow from date_day) <= 6 as boolean) as est_jour_ouvre
+    cast({{ jour_iso('cast(date_day as date)') }} <= 6 as boolean) as est_jour_ouvre
 from jours

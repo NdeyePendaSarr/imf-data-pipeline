@@ -24,7 +24,7 @@ models:
                 to: ref('dim_date')
                 field: date
       - name: code_compte
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -32,7 +32,7 @@ models:
                 to: ref('dim_compte_comptable')
                 field: code_compte
       - name: id_agence
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -89,7 +89,7 @@ models:
                 to: ref('dim_date')
                 field: date
       - name: rubrique
-        data_type: text
+        data_type: string
         description: Rubrique du compte de résultat (R1 à R6 du plan de comptes).
         data_tests:
           - not_null
@@ -98,11 +98,11 @@ models:
                 to: ref('rubriques_etats')
                 field: rubrique
       - name: libelle_rubrique
-        data_type: text
+        data_type: string
         description: Libellé d'affichage de la rubrique (seed rubriques_etats, K14).
         data_tests: [not_null]
       - name: type_rubrique
-        data_type: text
+        data_type: string
         description: PRODUITS, CHARGES ou MIXTE, déduit de la nature des comptes de la rubrique.
         data_tests:
           - not_null
@@ -156,7 +156,7 @@ models:
         description: Ordre de présentation dans le mois (A1, A2, P1, résultat, P2, P3).
         data_tests: [not_null]
       - name: cote
-        data_type: text
+        data_type: string
         description: ACTIF ou PASSIF (le résultat cumulé est au passif).
         data_tests:
           - not_null
@@ -164,7 +164,7 @@ models:
               arguments:
                 values: [ACTIF, PASSIF]
       - name: rubrique
-        data_type: text
+        data_type: string
         description: Rubrique du bilan, ou RESULTAT_CUMULE.
         data_tests:
           - not_null
@@ -173,7 +173,7 @@ models:
                 to: ref('rubriques_etats')
                 field: rubrique
       - name: libelle_rubrique
-        data_type: text
+        data_type: string
         description: Libellé d'affichage de la rubrique (seed rubriques_etats, K14).
         data_tests: [not_null]
       - name: montant
@@ -206,7 +206,7 @@ models:
                 to: ref('dim_date')
                 field: date
       - name: id_agence
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -214,7 +214,7 @@ models:
                 to: ref('dim_agence')
                 field: id_agence
       - name: controle
-        data_type: text
+        data_type: string
         description: DEPOTS (dépôts de la clientèle) ou CREDITS (encours de crédit).
         data_tests:
           - not_null
@@ -261,7 +261,7 @@ models:
                 to: ref('dim_date')
                 field: date
       - name: id_agence
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -269,7 +269,7 @@ models:
                 to: ref('dim_agence')
                 field: id_agence
       - name: code_produit
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:

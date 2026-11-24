@@ -69,8 +69,10 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Dépendances (uv sync --frozen)
-        run: uv sync --frozen
+      # Groupe bq explicite (L11) : tests du chargeur BigQuery, avec un client simulé, sans
+      # identifiants Google.
+      - name: Dépendances (uv sync --frozen --group bq)
+        run: uv sync --frozen --group bq
 
       - name: Lint (ruff check)
         run: uv run ruff check .
@@ -87,12 +89,12 @@ jobs:
       - name: Ingestion bronze (make ingest-all)
         run: make ingest-all
 
-      # dbt appelé directement : les cibles dbt du Makefile lisent le .env (uv --env-file).
-      - name: Packages dbt (dbt deps)
-        run: uv run dbt deps --project-dir dbt --profiles-dir dbt
+      # Cibles du Makefile : sans .env, uv prend les variables de l'environnement du job.
+      - name: Packages dbt (make dbt-deps)
+        run: make dbt-deps
 
-      - name: dbt build (cible dev)
-        run: uv run dbt build --project-dir dbt --profiles-dir dbt --target dev
+      - name: dbt build (make dbt-build, cible dev)
+        run: make dbt-build
 
       # Après dbt build, comme make check : les tests de vérité lisent le silver et le gold.
       # Les tests marqués airflow (DagBag, reprise) ne tournent que dans le conteneur Airflow.

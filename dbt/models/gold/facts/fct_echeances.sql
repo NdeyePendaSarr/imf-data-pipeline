@@ -60,8 +60,9 @@ select
         as bigint) as montant_impute_au_31_12,
     cv.date_couverture,
     -- Retard : de la date prévue à la couverture, ou au 31/12 si l'échéance n'est pas couverte.
-    cast(greatest(0, coalesce(cv.date_couverture, {{ arrete }}) - e.date_prevue) as integer)
-        as jours_retard
+    -- Écart en jours entre deux dates : dbt.datediff (date − date n'existe pas en BigQuery).
+    cast(greatest(0, {{ dbt.datediff('e.date_prevue', 'coalesce(cv.date_couverture, ' ~ arrete ~ ')', 'day') }})
+        as integer) as jours_retard
 from echeances as e
 inner join {{ ref('slv_credits') }} as c on c.id_credit = e.id_credit
 inner join {{ ref('slv_clients') }} as cl on cl.id_client = c.id_client

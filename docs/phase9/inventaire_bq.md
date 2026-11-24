@@ -105,6 +105,33 @@ comme alias d'`INT64` dans un `CAST`, mais les contrats comparent le type décla
 (`INT64`) : les `data_type` des contrats et les `column_types` des seeds devront être exprimés
 dans les deux dialectes (macros `dbt.type_string()`, `dbt.type_bigint()`… ou valeurs par cible).
 
+**Corrigé au portage :** `NUMERIC(6,4)` n'est pas compatible partout. BigQuery refuse les types
+paramétrés dans un `CAST` (y compris celui que dbt génère pour vérifier un contrat) : voir § 2.5,
+cas 5.
+
+### 2.5 Cas découverts au portage (étapes 3c et 3d)
+
+Absents de l'inventaire initial, révélés par `dbt build --target bq`. Tous remplacés sans
+désactiver de test ; résultats identiques sur PostgreSQL (empreinte du gold inchangée) et
+BigQuery (comparaison L3 : 0 écart).
+
+| # | Fichier | Construction PostgreSQL | Erreur ou risque BigQuery | Remplacement |
+|---:|---|---|---|---|
+| 1 | `models/silver/intermediate/int_evenements_comptables.sql` | `cross join lateral (values ('montant_paye', r.montant_paye), …) as champs (champ_montant, montant)` | syntaxe inconnue | un `select` par champ, réunis par `union all` (boucle Jinja) : SQL standard |
+| 2 | `tests/doublons_non_exacts.sql` | `count(distinct (col1, col2, …))` (comptage de lignes) | syntaxe inconnue | `select distinct id, col1, …` en sous-requête puis `count(*)` par identifiant : SQL standard |
+| 3 | `models/silver/staging/stg_catalogue_anomalies.sql` | `trim("table")` (identifiant entre guillemets doubles) | `"table"` est une chaîne en BigQuery : la colonne serait remplacée par le texte `table` | `trim({{ adapter.quote('table') }})` : `"table"` / `` `table` `` selon le moteur |
+| 4 | `models/silver/slv_lignes_ecartees.sql` | `id_credit \|\| '\|' \|\| num_echeance` (entier converti implicitement) | `\|\|` refuse un INT64 | `cast(num_echeance as {{ dbt.type_string() }})` |
+| 5 | `models/silver/slv_credits.sql`, `slv_produits_credit.sql`, contrats silver et gold | `cast(taux as numeric(6,4))`, `data_type: numeric(6,4)` | « Parameterized types are not allowed in CAST expressions » | macro `type_taux()` (`numeric(6,4)` / `numeric`) ; contrat par moteur (Jinja sur `target.type`) |
+| 6 | `tests/d17_nature_et_rubrique.sql`, `tests/gold/portefeuille_31_08_et_30_11.sql` | `(values (…), (…)) as c (col1, col2)` | « Expected keyword JOIN but got "," » | `select … union all select …` : SQL standard |
+| 7 | `models/gold/marts/mart_bilan.sql`, `mart_rapprochements.sql` | `union` (sans `all` ni `distinct`) | « Expected keyword ALL or keyword DISTINCT » | `union distinct` : forme standard, acceptée par PostgreSQL |
+
+Effet de bord côté PostgreSQL, sans lien avec BigQuery : après le remplacement du `distinct on`
+de `fct_ecritures` par `row_number() = 1`, le modèle passait de 2 s à plus de 9 min sur dev. Les
+seeds (< 50 lignes) et les tables tout juste recréées n'avaient aucune statistique (seuil de
+l'autovacuum) ; le planificateur estimait à 1 ligne une jointure de 181 193 lignes. Corrigé par un
+post-hook `analyze {{ this }}` sur les seeds et les modèles `table`, PostgreSQL seulement
+(`dbt_project.yml`).
+
 ## 3. Taille des schémas de `imf_dwh`
 
 `pg_total_relation_size` (table + index + TOAST), au 31/12/2025 après `dbt build` par défaut.

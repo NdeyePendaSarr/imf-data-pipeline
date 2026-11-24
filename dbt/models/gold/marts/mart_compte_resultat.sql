@@ -13,7 +13,7 @@ with fins_de_mois as (
     from {{ ref('dim_date') }}
     -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
-        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
+        and {{ dbt.date_trunc('month', 'date') }} <= {{ dbt.date_trunc('month', date_arrete()) }}
 ),
 
 comptes as (
@@ -26,8 +26,8 @@ types as (
     select
         rubrique,
         case
-            when bool_and(nature = 'PRODUIT') then 'PRODUITS'
-            when bool_and(nature = 'CHARGE') then 'CHARGES'
+            when {{ et_logique("nature = 'PRODUIT'") }} then 'PRODUITS'
+            when {{ et_logique("nature = 'CHARGE'") }} then 'CHARGES'
             else 'MIXTE'
         end as type_rubrique
     from comptes
@@ -37,7 +37,7 @@ types as (
 mouvements as (
     select
         c.rubrique,
-        (date_trunc('month', e.date_ecriture) + interval '1 month - 1 day')::date as date_fin_mois,
+        {{ dbt.last_day('e.date_ecriture', 'month') }} as date_fin_mois,
         sum(e.credit - e.debit) as resultat
     from {{ ref('fct_ecritures') }} as e
     inner join comptes as c on c.code_compte = e.code_compte
@@ -65,11 +65,11 @@ mensuel as (
 
 select
     cast(m.date_fin_mois as date) as date_fin_mois,
-    cast(m.rubrique as text) as rubrique,
+    cast(m.rubrique as {{ dbt.type_string() }}) as rubrique,
     -- Libellé d'affichage (K14, seed de présentation) ; jointure externe : un libellé manquant
     -- est signalé par le test not_null au lieu de faire disparaître la ligne.
-    cast(l.libelle as text) as libelle_rubrique,
-    cast(m.type_rubrique as text) as type_rubrique,
+    cast(l.libelle as {{ dbt.type_string() }}) as libelle_rubrique,
+    cast(m.type_rubrique as {{ dbt.type_string() }}) as type_rubrique,
     cast(case when m.type_rubrique = 'CHARGES' then -m.resultat_mois else m.resultat_mois end as bigint)
         as montant_mois,
     cast(case when m.type_rubrique = 'CHARGES' then -m.resultat_cumul else m.resultat_cumul end as bigint)

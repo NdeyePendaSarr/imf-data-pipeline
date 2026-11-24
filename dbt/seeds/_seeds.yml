@@ -7,10 +7,11 @@ seeds:
       indicatives. v0.5 (H8) : rubrique_solde_inverse = rubrique où classer le compte si son solde
       est inversé (comptes de liaison non compensés, D13) ; vide pour les autres comptes.
     config:
+      # Types par moteur (L7) : text n'existe pas en BigQuery (string).
       column_types:
-        compte_sfd: text
-        compte_syscohada_equiv: text
-        rubrique_solde_inverse: text
+        compte_sfd: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        compte_syscohada_equiv: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        rubrique_solde_inverse: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
     columns:
       - name: rubrique_solde_inverse
         description: Rubrique de reclassement d'un solde inversé (P3_DETTES_TRESORERIE pour les liaisons).
@@ -24,11 +25,11 @@ seeds:
       le journal (OUV pour OUVERTURE, VIR pour APPRO_CAISSE), vide sinon.
     config:
       column_types:
-        code_journal: text
-        libelle: text
-        priorite: integer
-        regle: text
-        type_evenement: text
+        code_journal: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        libelle: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        priorite: "{{ 'int64' if target.type == 'bigquery' else 'integer' }}"
+        regle: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        type_evenement: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
   - name: rubriques_etats
     description: >
       Libellés d'affichage des rubriques du bilan et du compte de résultat (K14, phase 8).
@@ -36,8 +37,8 @@ seeds:
       pas version_mapping.
     config:
       column_types:
-        rubrique: text
-        libelle: text
+        rubrique: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        libelle: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
     columns:
       - name: rubrique
         description: Code de rubrique (plan de comptes, ou RESULTAT_CUMULE pour le bilan).

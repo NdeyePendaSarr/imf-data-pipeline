@@ -68,23 +68,33 @@ candidats_journal as (
 ),
 
 journal_piece as (
-    select distinct on (id_ecriture) id_ecriture, code_journal
-    from candidats_journal
-    order by id_ecriture, priorite, code_journal
+    -- Premier journal candidat de chaque pièce (priorité, puis code) : row_number() = 1 en
+    -- sous-requête, SQL standard (distinct on n'existe qu'en PostgreSQL, L6).
+    select id_ecriture, code_journal
+    from (
+        select
+            id_ecriture,
+            code_journal,
+            row_number() over (
+                partition by id_ecriture order by priorite, code_journal
+            ) as rang
+        from candidats_journal
+    ) as classes
+    where rang = 1
 )
 
 select
-    cast(l.id_ecriture as text) as id_ecriture,
+    cast(l.id_ecriture as {{ dbt.type_string() }}) as id_ecriture,
     cast(l.num_ligne as integer) as num_ligne,
     cast(l.date_ecriture as date) as date_ecriture,
-    cast(j.code_journal as text) as code_journal,
-    cast(l.id_agence as text) as id_agence,
-    cast(l.code_compte as text) as code_compte,
+    cast(j.code_journal as {{ dbt.type_string() }}) as code_journal,
+    cast(l.id_agence as {{ dbt.type_string() }}) as id_agence,
+    cast(l.code_compte as {{ dbt.type_string() }}) as code_compte,
     cast(l.debit as bigint) as debit,
     cast(l.credit as bigint) as credit,
-    cast(l.type_evenement as text) as type_evenement,
-    cast(l.source_table as text) as source_table,
-    cast(l.source_id as text) as source_id,
-    cast('{{ var("version_mapping") }}' as text) as version_mapping
+    cast(l.type_evenement as {{ dbt.type_string() }}) as type_evenement,
+    cast(l.source_table as {{ dbt.type_string() }}) as source_table,
+    cast(l.source_id as {{ dbt.type_string() }}) as source_id,
+    cast('{{ var("version_mapping") }}' as {{ dbt.type_string() }}) as version_mapping
 from lignes as l
 inner join journal_piece as j on j.id_ecriture = l.id_ecriture

@@ -80,7 +80,8 @@ portefeuille as (
         cj.id_agence,
         cj.code_produit,
         cj.montant_accorde - cj.capital_rembourse as encours,
-        coalesce(cj.jour - r.plus_ancienne_impayee, 0) as jours_retard
+        -- Écart en jours : dbt.datediff (date − date n'existe pas en BigQuery).
+        coalesce({{ dbt.datediff('r.plus_ancienne_impayee', 'cj.jour', 'day') }}, 0) as jours_retard
     from credit_jour as cj
     left join retards as r on r.id_credit = cj.id_credit and r.jour = cj.jour
 )
@@ -88,10 +89,10 @@ portefeuille as (
 select
     cast(jour as date) as date,
     cast(est_jour_ouvre as boolean) as est_jour_ouvre,
-    cast(id_credit as text) as id_credit,
-    cast(id_client as text) as id_client,
-    cast(id_agence as text) as id_agence,
-    cast(code_produit as text) as code_produit,
+    cast(id_credit as {{ dbt.type_string() }}) as id_credit,
+    cast(id_client as {{ dbt.type_string() }}) as id_client,
+    cast(id_agence as {{ dbt.type_string() }}) as id_agence,
+    cast(code_produit as {{ dbt.type_string() }}) as code_produit,
     cast(encours as bigint) as encours,
     cast(jours_retard as integer) as jours_retard,
     cast(case
@@ -100,6 +101,6 @@ select
         when jours_retard <= 90 then '31-90'
         when jours_retard <= 180 then '91-180'
         else '>180'
-    end as text) as tranche_retard
+    end as {{ dbt.type_string() }}) as tranche_retard
 from portefeuille
 where encours > 0

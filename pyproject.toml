@@ -11,6 +11,11 @@ dependencies = [
 ]
 
 [dependency-groups]
+bq = [
+    "dbt-bigquery>=1.12.4",
+    "google-cloud-bigquery>=3.47.0",
+    "pyarrow>=26.0.1",
+]
 dbt = [
     "dbt-core>=1.8",
     "dbt-postgres>=1.8",
@@ -25,8 +30,10 @@ dev = [
 [tool.uv]
 # Projet applicatif : pas de paquet Python à construire.
 package = false
-# uv sync / uv run installent aussi dbt (groupe séparé, cf. décision S1).
-default-groups = ["dev", "dbt"]
+# uv sync / uv run installent aussi dbt (groupe séparé, cf. décision S1) et BigQuery (groupe bq :
+# google-cloud-bigquery, pyarrow, dbt-bigquery ; L11). Aucune dépendance Google dans le projet
+# lui-même ; l'image Airflow n'installe que le groupe dbt (--no-default-groups --group dbt).
+default-groups = ["dev", "dbt", "bq"]
 
 [tool.ruff]
 line-length = 100
@@ -43,7 +50,7 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["tests", "generator", "ingestion", "airflow", "orchestration"]
+files = ["tests", "generator", "ingestion", "airflow", "orchestration", "scripts"]
 
 [[tool.mypy.overrides]]
 # Airflow n'est installé que dans son image (phase 7), jamais dans le venv du projet : ses
@@ -56,6 +63,12 @@ ignore_missing_imports = true
 # DAG est exempté de ce contrôle ; le reste du mode strict s'applique.
 module = ["imf_quotidien"]
 disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+# pyarrow n'est pas typé (ni py.typed ni stubs publiés) : imports ignorés (chargeur BigQuery,
+# phase 9). google-cloud-bigquery, lui, est typé.
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "generator/tests", "ingestion/tests", "orchestration/tests"]

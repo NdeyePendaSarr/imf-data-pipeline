@@ -12,13 +12,13 @@ models:
         enforced: true
     columns:
       - name: id_mouvement
-        data_type: text
+        data_type: string
         description: Identifiant déterministe et lisible, type_mouvement:source_id.
         data_tests:
           - unique
           - not_null
       - name: id_compte
-        data_type: text
+        data_type: string
         description: Compte client mouvementé.
         data_tests:
           - not_null
@@ -32,7 +32,7 @@ models:
         data_tests:
           - not_null
       - name: type_mouvement
-        data_type: text
+        data_type: string
         description: DEPOT, RETRAIT, FRAIS_TENUE, DECAISSEMENT, FRAIS_DOSSIER ou PRELEVEMENT.
         data_tests:
           - not_null
@@ -45,10 +45,10 @@ models:
         data_tests:
           - not_null
       - name: source_table
-        data_type: text
+        data_type: string
         description: Modèle silver d'origine (slv_operations, slv_credits, slv_remboursements).
       - name: source_id
-        data_type: text
+        data_type: string
         description: Identifiant de la ligne d'origine dans source_table.
 
   - name: int_evenements_comptables
@@ -65,15 +65,15 @@ models:
             combination_of_columns: [source_table, source_id, type_evenement, champ_montant]
     columns:
       - name: type_evenement
-        data_type: text
+        data_type: string
         description: Type d'événement du mapping comptable (DEPOT, REMBOURSEMENT, CHARGE_LOYERS…).
         data_tests: [not_null]
       - name: source_table
-        data_type: text
+        data_type: string
         description: Source au sens de mapping_comptable (ouverture, appro_caisse, operations, credits, remboursements, charges).
         data_tests: [not_null]
       - name: source_id
-        data_type: text
+        data_type: string
         description: Identifiant de la ligne source (agence|canal pour ouverture).
         data_tests: [not_null]
       - name: date_evenement
@@ -81,14 +81,14 @@ models:
         description: Date de l'événement (01/01 de l'exercice pour l'ouverture).
         data_tests: [not_null]
       - name: id_agence
-        data_type: text
+        data_type: string
         description: Agence du client (operations, credits, remboursements) ou de la source.
         data_tests: [not_null]
       - name: canal
-        data_type: text
+        data_type: string
         description: Canal de la source ; NULL pour appro_caisse et credits.
       - name: champ_montant
-        data_type: text
+        data_type: string
         description: Colonne montant de la source (champ_montant de mapping_comptable).
         data_tests: [not_null]
       - name: montant
@@ -105,13 +105,13 @@ models:
         enforced: true
     columns:
       - name: type_evenement
-        data_type: text
+        data_type: string
       - name: source_table
-        data_type: text
+        data_type: string
       - name: source_id
-        data_type: text
+        data_type: string
       - name: motif
-        data_type: text
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:

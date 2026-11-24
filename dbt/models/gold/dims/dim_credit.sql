@@ -17,7 +17,7 @@ select
     cast(case
         when coalesce(r.capital_rembourse, 0) >= c.montant_accorde then 'SOLDE'
         else 'EN_COURS'
-    end as text) as statut_a_l_arrete
+    end as {{ dbt.type_string() }}) as statut_a_l_arrete
 from {{ ref('slv_credits') }} as c
 left join (
     select id_credit, sum(part_capital) as capital_rembourse

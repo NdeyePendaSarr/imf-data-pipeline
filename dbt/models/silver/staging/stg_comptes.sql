@@ -16,6 +16,6 @@ select
     _id_run,
     _source,
     _num_ligne,
-    cast(null as text) as motif_ecart
+    cast(null as {{ dbt.type_string() }}) as motif_ecart
 from versions
 where rang_version = 1

@@ -14,7 +14,7 @@ with fins_de_mois as (
     from {{ ref('dim_date') }}
     -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
-        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
+        and {{ dbt.date_trunc('month', 'date') }} <= {{ dbt.date_trunc('month', date_arrete()) }}
 ),
 
 gestion as (
@@ -39,7 +39,8 @@ controles as (
 
 agences as (
     select id_agence from {{ ref('dim_client') }}
-    union
+    -- union distinct : forme standard ; BigQuery refuse un union nu, PostgreSQL l'accepte.
+    union distinct
     select id_agence from {{ ref('mart_balance') }}
     where code_compte in ('DEPOTS_EPARGNE', 'CREDITS_SAINS')
 ),
@@ -61,8 +62,8 @@ compta as (
 
 select
     cast(f.date_fin_mois as date) as date_fin_mois,
-    cast(a.id_agence as text) as id_agence,
-    cast(k.controle as text) as controle,
+    cast(a.id_agence as {{ dbt.type_string() }}) as id_agence,
+    cast(k.controle as {{ dbt.type_string() }}) as controle,
     cast(coalesce(g.valeur, 0) as bigint) as valeur_gestion,
     cast(coalesce(c.valeur, 0) as bigint) as valeur_compta,
     cast(coalesce(g.valeur, 0) - coalesce(c.valeur, 0) as bigint) as ecart,

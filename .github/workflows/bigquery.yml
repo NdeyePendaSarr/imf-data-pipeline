@@ -1,0 +1,101 @@
+# Reconstruction BigQuery (phase 9, L4, L13, L14) : bronze rechargé, dbt build sur la cible bq et
+# comparaison des deux moteurs (0 écart attendu). Déclenché à la main seulement : il écrit dans le
+# projet Google Cloud (bac à sable).
+#
+# Authentification par fédération d'identité (Workload Identity Federation) : GitHub émet un jeton
+# OIDC, échangé contre l'identité du compte de service. Aucune clé, aucun secret dans le dépôt ni
+# dans GitHub. Variables du dépôt (Settings > Secrets and variables > Actions > Variables) :
+# BQ_PROJECT, BQ_LOCATION, GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT.
+name: BigQuery
+
+on:
+  workflow_dispatch:
+
+# Un seul run à la fois : deux rebuilds simultanés écriraient dans les mêmes datasets.
+concurrency:
+  group: bigquery
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write  # jeton OIDC pour la fédération d'identité
+
+jobs:
+  rebuild-bq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # PostgreSQL éphémère (référence dev de la comparaison), comme ci.yml.
+      POSTGRES_USER: imf_ci
+      # Mot de passe jetable, propre à la CI : il ne protège qu'un conteneur détruit en fin de job.
+      POSTGRES_PASSWORD: ci_jetable_non_secret
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB_OPS: imf_ops
+      POSTGRES_DB_DWH: imf_dwh
+      # BigQuery : variables du dépôt, aucune valeur en dur.
+      BQ_PROJECT: ${{ vars.BQ_PROJECT }}
+      BQ_LOCATION: ${{ vars.BQ_LOCATION }}
+
+    services:
+      postgres:
+        # Même version majeure que docker-compose.yml (postgres:17).
+        image: postgres:17
+        # Le contexte env n'est pas disponible dans un service : valeurs recopiées de env ci-dessus.
+        env:
+          POSTGRES_USER: imf_ci
+          POSTGRES_PASSWORD: ci_jetable_non_secret
+          POSTGRES_DB: imf_dwh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imf_ci -d imf_dwh"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Initialisation des bases (docker/postgres/init)
+        env:
+          PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        run: |
+          until pg_isready -h localhost -p 5432 -U "$POSTGRES_USER" -d imf_dwh; do sleep 1; done
+          for script in docker/postgres/init/*.sql; do
+            psql -h localhost -p 5432 -U "$POSTGRES_USER" -d imf_dwh -v ON_ERROR_STOP=1 -f "$script"
+          done
+
+      # Identité Google par fédération : identifiants par défaut (ADC) pour le client BigQuery et
+      # dbt (method: oauth), valables le temps du job.
+      - name: Authentification Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dépendances (uv sync --frozen)
+        run: uv sync --frozen
+
+      - name: Données (make generate)
+        run: make generate
+
+      - name: Ingestion bronze (make ingest-all)
+        run: make ingest-all
+
+      - name: dbt build PostgreSQL (make dbt-build, cible dev)
+        run: make dbt-build
+
+      # load-bq, dbt build --target bq, compare-moteurs. La comparaison écrit son tableau dans
+      # $GITHUB_STEP_SUMMARY (page du run) et fait échouer le job au moindre écart.
+      - name: Rebuild BigQuery et comparaison (make rebuild-bq)
+        run: make rebuild-bq

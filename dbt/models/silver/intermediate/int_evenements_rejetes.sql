@@ -60,9 +60,9 @@ motifs as (
 )
 
 select
-    cast(type_evenement as text) as type_evenement,
-    cast(source_table as text) as source_table,
-    cast(source_id as text) as source_id,
-    cast(motif as text) as motif
+    cast(type_evenement as {{ dbt.type_string() }}) as type_evenement,
+    cast(source_table as {{ dbt.type_string() }}) as source_table,
+    cast(source_id as {{ dbt.type_string() }}) as source_id,
+    cast(motif as {{ dbt.type_string() }}) as motif
 from motifs
 where motif is not null

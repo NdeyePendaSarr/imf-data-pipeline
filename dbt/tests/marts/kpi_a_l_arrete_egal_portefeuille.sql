@@ -12,7 +12,8 @@ portefeuille as (
     select
         count(*) as nb_lignes,
         sum(encours) as encours,
-        sum(encours) filter (where jours_retard > 30) as encours_par30
+        -- sum(case when …) : SQL standard (filter (where …) n'existe pas en BigQuery).
+        sum(case when jours_retard > 30 then encours end) as encours_par30
     from {{ ref('fct_portefeuille_quotidien') }}
     where date = {{ date_arrete() }}
 )

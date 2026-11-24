@@ -76,8 +76,8 @@ par_credit as (
 
 select
     cast(jour as date) as date,
-    cast(id_agence as text) as id_agence,
-    cast(code_produit as text) as code_produit,
+    cast(id_agence as {{ dbt.type_string() }}) as id_agence,
+    cast(code_produit as {{ dbt.type_string() }}) as code_produit,
     cast(sum(actif) as integer) as nb_credits_actifs,
     cast(sum(encours) as bigint) as encours,
     cast(sum(encours_par30) as bigint) as encours_par30,

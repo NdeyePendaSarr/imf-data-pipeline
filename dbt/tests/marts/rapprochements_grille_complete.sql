@@ -3,7 +3,7 @@
 with attendu as (
     select
         (select count(*) from {{ ref('dim_date') }} where dans_exercice and est_fin_de_mois
-            and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }}))
+            and {{ dbt.date_trunc('month', 'date') }} <= {{ dbt.date_trunc('month', date_arrete()) }})
         * (select count(distinct id_agence) from {{ ref('dim_client') }})
         * 2 as nb
 ),

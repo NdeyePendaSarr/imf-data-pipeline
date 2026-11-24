@@ -24,7 +24,7 @@ models:
                 min_value: 1
                 max_value: 12
       - name: annee_mois
-        data_type: text
+        data_type: string
         description: Mois au format AAAA-MM.
       - name: trimestre
         data_type: integer
@@ -58,17 +58,17 @@ models:
         enforced: true
     columns:
       - name: id_agence
-        data_type: text
+        data_type: string
         description: Clé naturelle de l'agence.
         data_tests: [unique, not_null]
       - name: nom
-        data_type: text
+        data_type: string
       - name: ville
-        data_type: text
+        data_type: string
       - name: region
-        data_type: text
+        data_type: string
       - name: type_agence
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - accepted_values:
@@ -87,11 +87,11 @@ models:
         enforced: true
     columns:
       - name: id_client
-        data_type: text
+        data_type: string
         description: Clé naturelle du client.
         data_tests: [unique, not_null]
       - name: id_agence
-        data_type: text
+        data_type: string
         description: Agence du client.
         data_tests:
           - not_null
@@ -100,7 +100,7 @@ models:
                 to: ref('dim_agence')
                 field: id_agence
       - name: sexe
-        data_type: text
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:
@@ -112,14 +112,14 @@ models:
         data_type: integer
         description: Âge révolu au 31/12 de l'exercice.
       - name: tranche_age
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ["18-25", "26-35", "36-45", "46-55", "56-65", "66+", NON_RENSEIGNE]
       - name: secteur_activite
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - accepted_values:
@@ -141,11 +141,11 @@ models:
         enforced: true
     columns:
       - name: id_compte
-        data_type: text
+        data_type: string
         description: Clé naturelle du compte client.
         data_tests: [unique, not_null]
       - name: id_client
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -153,13 +153,13 @@ models:
                 to: ref('dim_client')
                 field: id_client
       - name: type_compte
-        data_type: text
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:
                 values: [EPARGNE, COURANT]
       - name: statut
-        data_type: text
+        data_type: string
       - name: date_ouverture
         data_type: date
         data_tests:
@@ -176,21 +176,21 @@ models:
         enforced: true
     columns:
       - name: code_produit
-        data_type: text
+        data_type: string
         description: Clé naturelle du produit.
         data_tests: [unique, not_null]
       - name: libelle
-        data_type: text
+        data_type: string
       - name: taux_annuel
-        data_type: numeric(6,4)
+        data_type: "{{ 'numeric' if target.type == 'bigquery' else 'numeric(6,4)' }}"
       - name: taux_frais_dossier
-        data_type: numeric(6,4)
+        data_type: "{{ 'numeric' if target.type == 'bigquery' else 'numeric(6,4)' }}"
       - name: duree_min_mois
         data_type: smallint
       - name: duree_max_mois
         data_type: smallint
       - name: periodicite
-        data_type: text
+        data_type: string
 
   - name: dim_credit
     description: >
@@ -201,11 +201,11 @@ models:
         enforced: true
     columns:
       - name: id_credit
-        data_type: text
+        data_type: string
         description: Clé naturelle du crédit.
         data_tests: [unique, not_null]
       - name: id_client
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -213,7 +213,7 @@ models:
                 to: ref('dim_client')
                 field: id_client
       - name: id_compte_epargne
-        data_type: text
+        data_type: string
         description: Compte d'épargne sur lequel le crédit est versé.
         data_tests:
           - not_null
@@ -222,7 +222,7 @@ models:
                 to: ref('dim_compte_client')
                 field: id_compte
       - name: code_produit
-        data_type: text
+        data_type: string
         data_tests:
           - not_null
           - relationships:
@@ -244,16 +244,16 @@ models:
       - name: duree_mois
         data_type: smallint
       - name: taux_annuel
-        data_type: numeric(6,4)
+        data_type: "{{ 'numeric' if target.type == 'bigquery' else 'numeric(6,4)' }}"
       - name: statut_au_31_12
-        data_type: text
+        data_type: string
         description: EN_COURS ou SOLDE au 31/12 de l'exercice (nom conservé volontairement).
         data_tests:
           - accepted_values:
               arguments:
                 values: [EN_COURS, SOLDE]
       - name: statut_a_l_arrete
-        data_type: text
+        data_type: string
         description: >
           EN_COURS ou SOLDE à la date d'arrêté, déduit du capital remboursé jusqu'à l'arrêté (même
           règle que fct_portefeuille_quotidien). À utiliser pour toute analyse à date.
@@ -272,44 +272,44 @@ models:
         enforced: true
     columns:
       - name: code_compte
-        data_type: text
+        data_type: string
         description: Clé naturelle du compte comptable (code interne).
         data_tests: [unique, not_null]
       - name: libelle
-        data_type: text
+        data_type: string
       - name: nature
-        data_type: text
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:
                 values: [ACTIF, PASSIF, CHARGE, PRODUIT]
       - name: sens_normal
-        data_type: text
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:
                 values: [D, C]
       - name: etat
-        data_type: text
+        data_type: string
         description: BILAN ou CR (compte de résultat).
         data_tests:
           - accepted_values:
               arguments:
                 values: [BILAN, CR]
       - name: rubrique
-        data_type: text
+        data_type: string
         data_tests: [not_null]
       - name: compte_sfd
-        data_type: text
+        data_type: string
       - name: compte_syscohada_equiv
-        data_type: text
+        data_type: string
       - name: statut_correspondance
-        data_type: text
+        data_type: string
       - name: mvp
         data_type: boolean
         data_tests: [not_null]
       - name: rubrique_solde_inverse
-        data_type: text
+        data_type: string
         description: >
           Rubrique de reclassement si le solde du compte est inversé (H8) : P3_DETTES_TRESORERIE
           pour TRESO_LIAISON_MM et TRESO_LIAISON_AGENT (non compensés, D13), vide sinon.
@@ -325,12 +325,12 @@ models:
         enforced: true
     columns:
       - name: code_journal
-        data_type: text
+        data_type: string
         description: Clé naturelle du journal.
         data_tests: [unique, not_null]
       - name: libelle
-        data_type: text
+        data_type: string
       - name: priorite
         data_type: integer
       - name: regle
-        data_type: text
+        data_type: string

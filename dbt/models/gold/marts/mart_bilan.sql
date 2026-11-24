@@ -14,7 +14,7 @@ with fins_de_mois as (
     from {{ ref('dim_date') }}
     -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
-        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
+        and {{ dbt.date_trunc('month', 'date') }} <= {{ dbt.date_trunc('month', date_arrete()) }}
 ),
 
 comptes as (
@@ -27,7 +27,7 @@ mouvements as (
     -- Mouvements du mois par compte, toutes agences confondues.
     select
         e.code_compte,
-        (date_trunc('month', e.date_ecriture) + interval '1 month - 1 day')::date as date_fin_mois,
+        {{ dbt.last_day('e.date_ecriture', 'month') }} as date_fin_mois,
         sum(e.debit - e.credit) as mouvement_net
     from {{ ref('fct_ecritures') }} as e
     inner join comptes as c on c.code_compte = e.code_compte
@@ -69,7 +69,8 @@ classes as (
 rubriques as (
     -- Toutes les rubriques possibles du bilan, présentes chaque mois (même à 0).
     select rubrique from comptes
-    union
+    -- union distinct : forme standard ; BigQuery refuse un union nu, PostgreSQL l'accepte.
+    union distinct
     select rubrique_solde_inverse from comptes where rubrique_solde_inverse is not null
 ),
 
@@ -107,11 +108,11 @@ select
             p.rubrique = 'RESULTAT_CUMULE',
             p.rubrique
     ) as integer) as ordre,
-    cast(p.cote as text) as cote,
-    cast(p.rubrique as text) as rubrique,
+    cast(p.cote as {{ dbt.type_string() }}) as cote,
+    cast(p.rubrique as {{ dbt.type_string() }}) as rubrique,
     -- Libellé d'affichage (K14, seed de présentation) ; jointure externe : un libellé manquant
     -- est signalé par le test not_null au lieu de faire disparaître la ligne.
-    cast(l.libelle as text) as libelle_rubrique,
+    cast(l.libelle as {{ dbt.type_string() }}) as libelle_rubrique,
     cast(p.montant as bigint) as montant,
     cast(least(p.date_fin_mois, {{ date_arrete() }}) as date) as date_situation
 from postes as p

@@ -36,7 +36,7 @@ evenements as (
     -- Approvisionnement de caisse (D18) : deux comptes fixes, pas de canal.
     select
         'APPRO_CAISSE', 'appro_caisse', id_appro, date_appro, id_agence,
-        cast(null as text), 'montant', montant
+        cast(null as {{ dbt.type_string() }}), 'montant', montant
     from {{ ref('slv_appro_caisse') }}
 
     union all
@@ -53,7 +53,7 @@ evenements as (
     -- Crédit : deux événements, le décaissement et les frais de dossier.
     select
         'DECAISSEMENT', 'credits', c.id_credit, c.date_decaissement, a.id_agence,
-        cast(null as text), 'montant_accorde', c.montant_accorde
+        cast(null as {{ dbt.type_string() }}), 'montant_accorde', c.montant_accorde
     from {{ ref('slv_credits') }} as c
     inner join agence_credit as a on a.id_credit = c.id_credit
 
@@ -61,27 +61,24 @@ evenements as (
 
     select
         'FRAIS_DOSSIER', 'credits', c.id_credit, c.date_decaissement, a.id_agence,
-        cast(null as text), 'frais_dossier', c.frais_dossier
+        cast(null as {{ dbt.type_string() }}), 'frais_dossier', c.frais_dossier
     from {{ ref('slv_credits') }} as c
     inner join agence_credit as a on a.id_credit = c.id_credit
 
     union all
 
     -- Remboursement : un événement, quatre champs montant (payé, capital, intérêts, pénalités).
+    -- Un select par champ (SQL standard, L6) : cross join lateral (values …) n'existe pas en
+    -- BigQuery. Mêmes lignes : une par remboursement et par champ.
+    {%- for champ in ['montant_paye', 'part_capital', 'part_interets', 'penalites'] %}
     select
         'REMBOURSEMENT', 'remboursements', r.id_remboursement, r.date_remboursement, a.id_agence,
-        r.canal, champs.champ_montant, champs.montant
+        r.canal, '{{ champ }}', r.{{ champ }}
     from {{ ref('slv_remboursements') }} as r
     inner join agence_credit as a on a.id_credit = r.id_credit
-    cross join lateral (
-        values
-            ('montant_paye', r.montant_paye),
-            ('part_capital', r.part_capital),
-            ('part_interets', r.part_interets),
-            ('penalites', r.penalites)
-    ) as champs (champ_montant, montant)
 
     union all
+    {%- endfor %}
 
     -- Charges : le type d'événement est CHARGE_ suivi de la catégorie.
     select
@@ -91,12 +88,12 @@ evenements as (
 )
 
 select
-    cast(type_evenement as text) as type_evenement,
-    cast(source_table as text) as source_table,
-    cast(source_id as text) as source_id,
+    cast(type_evenement as {{ dbt.type_string() }}) as type_evenement,
+    cast(source_table as {{ dbt.type_string() }}) as source_table,
+    cast(source_id as {{ dbt.type_string() }}) as source_id,
     cast(date_evenement as date) as date_evenement,
-    cast(id_agence as text) as id_agence,
-    cast(canal as text) as canal,
-    cast(champ_montant as text) as champ_montant,
+    cast(id_agence as {{ dbt.type_string() }}) as id_agence,
+    cast(canal as {{ dbt.type_string() }}) as canal,
+    cast(champ_montant as {{ dbt.type_string() }}) as champ_montant,
     cast(montant as bigint) as montant
 from evenements

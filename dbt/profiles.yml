@@ -13,3 +13,18 @@ imf_dwh:
       # Schéma par défaut ; generate_schema_name impose les schémas exacts silver / gold.
       schema: silver
       threads: 4
+    # BigQuery (phase 9, bac à sable) : identifiants Google par défaut (ADC, gcloud auth
+    # application-default login), aucune clé dans le dépôt. Projet et région lus dans .env ; les
+    # datasets créés par dbt (silver, gold) prennent cette région (L5 : EU, jamais changée).
+    # Sources bronze / audit : datasets du même projet, chargés par make load-bq.
+    bq:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('BQ_PROJECT') }}"
+      location: "{{ env_var('BQ_LOCATION') }}"
+      # Dataset par défaut ; generate_schema_name impose les datasets exacts silver / gold.
+      dataset: silver
+      threads: 4
+      priority: interactive
+      # Garde-fou : une requête qui lirait plus de 1 Go échoue au lieu d'être facturée.
+      maximum_bytes_billed: 1000000000

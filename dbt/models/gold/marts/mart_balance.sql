@@ -11,14 +11,14 @@ with fins_de_mois as (
     from {{ ref('dim_date') }}
     -- Mois jusqu'au mois de l'arrêté inclus ; le dernier peut être partiel (date_situation).
     where dans_exercice and est_fin_de_mois
-        and date_trunc('month', date) <= date_trunc('month', {{ date_arrete() }})
+        and {{ dbt.date_trunc('month', 'date') }} <= {{ dbt.date_trunc('month', date_arrete()) }}
 ),
 
 mouvements as (
     select
         code_compte,
         id_agence,
-        (date_trunc('month', date_ecriture) + interval '1 month - 1 day')::date as date_fin_mois,
+        {{ dbt.last_day('date_ecriture', 'month') }} as date_fin_mois,
         sum(debit) as mouvement_debit,
         sum(credit) as mouvement_credit
     from {{ ref('fct_ecritures') }}
@@ -61,8 +61,8 @@ avec_ouverture as (
 
 select
     cast(date_fin_mois as date) as date_fin_mois,
-    cast(code_compte as text) as code_compte,
-    cast(id_agence as text) as id_agence,
+    cast(code_compte as {{ dbt.type_string() }}) as code_compte,
+    cast(id_agence as {{ dbt.type_string() }}) as id_agence,
     cast(greatest(solde_ouverture, 0) as bigint) as solde_ouverture_debit,
     cast(greatest(-solde_ouverture, 0) as bigint) as solde_ouverture_credit,
     cast(mouvement_debit as bigint) as mouvement_debit,

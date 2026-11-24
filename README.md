@@ -81,6 +81,15 @@ make ingest-all        # ingère tout l'exercice dans bronze (imf_dwh)
 make dbt-build         # silver et gold : seeds, modèles et tests dbt
 ```
 
+BigQuery (phase 9, facultatif : projet Google Cloud, `gcloud auth application-default login`,
+`BQ_PROJECT` et `BQ_LOCATION` dans `.env`) :
+
+```bash
+make load-bq           # copie le bronze et audit_runs vers BigQuery (Parquet, load jobs)
+make rebuild-bq        # load-bq, dbt build --target bq, puis compare-moteurs
+make compare-moteurs   # compare gold et silver PostgreSQL / BigQuery ; échoue au moindre écart
+```
+
 **Se connecter :**
 
 | Base | Rôle |

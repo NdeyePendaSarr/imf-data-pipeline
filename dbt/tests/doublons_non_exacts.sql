@@ -7,10 +7,15 @@
     ('stg_charges', 'id_charge', ['id_agence', 'date_charge', 'categorie', 'canal', 'montant']),
     ('stg_appro_caisse', 'id_appro', ['id_agence', 'date_appro', 'montant']),
 ] %}
+{#- Versions distinctes par identifiant : select distinct puis comptage (SQL standard, L6) ;
+    count(distinct (a, b, …)) sur une ligne n'existe qu'en PostgreSQL. #}
 {% for modele, identifiant, colonnes in sources %}
-select '{{ modele }}' as modele, {{ identifiant }} as id_ligne, count(distinct ({{ colonnes | join(', ') }})) as versions
-from {{ ref(modele) }}
-group by {{ identifiant }}
-having count(distinct ({{ colonnes | join(', ') }})) > 1
+select '{{ modele }}' as modele, id_ligne, count(*) as versions
+from (
+    select distinct {{ identifiant }} as id_ligne, {{ colonnes | join(', ') }}
+    from {{ ref(modele) }}
+) as distinctes
+group by id_ligne
+having count(*) > 1
 {% if not loop.last %}union all{% endif %}
 {% endfor %}

@@ -25,6 +25,12 @@ flags:
 
 models:
   imf_dwh:
+    # PostgreSQL : statistiques calculées dès la création de chaque table, sans attendre
+    # l'autovacuum. Sans elles, le planificateur estime à 1 ligne des jointures de plusieurs
+    # dizaines de milliers (fct_ecritures : boucles imbriquées, > 9 min au lieu de 2 s). Vues et
+    # BigQuery : rien à faire.
+    +post-hook: >-
+      {% if target.type == 'postgres' and config.get('materialized') == 'table' %}analyze {{ this }}{% endif %}
     silver:
       # Silver : tables reconstruites à chaque build, aucun incrémental (S14).
       +schema: silver
@@ -47,8 +53,14 @@ seeds:
     # Recréés à chaque build : un changement de colonnes (journaux v0.4) ne demande plus de
     # --full-refresh manuel. Les vues qui en dépendent sont reconstruites dans le même build.
     +full_refresh: true
+    # PostgreSQL : statistiques recalculées après chaque chargement. Les seeds (< 50 lignes)
+    # restent sous le seuil de l'autovacuum ; sans statistiques, le planificateur estime à
+    # 1 ligne la jointure événements × mapping_comptable et fct_ecritures passe en boucles
+    # imbriquées (> 9 min au lieu de 2 s). BigQuery n'a pas d'équivalent ni de besoin.
+    +post-hook: "{% if target.type == 'postgres' %}analyze {{ this }}{% endif %}"
+    # Types de colonnes par moteur (L7) : text n'existe pas en BigQuery (string).
     canaux_autorises:
       +column_types:
-        source: text
-        canal: text
-        commentaire: text
+        source: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        canal: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
+        commentaire: "{{ 'string' if target.type == 'bigquery' else 'text' }}"
