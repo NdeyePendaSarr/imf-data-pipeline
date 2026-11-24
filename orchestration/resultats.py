@@ -33,6 +33,10 @@ VOLUME_SEMAINES_REFERENCE = 4
 # de mois (croissance du mois écoulé).
 VOLUME_JOURS_TENDANCE = 7
 VOLUME_JOURS_TENDANCE_FIN_DE_MOIS = 28
+# Référence minimale pour contrôler le volume (K11, phase 9) : en dessous, un ratio n'a pas de
+# sens (dimanche du 16/02 : 16 opérations pour une référence de 8, soit 198 %). Pas de contrôle,
+# même statut que l'absence d'historique.
+VOLUME_REFERENCE_MIN = 20
 DIMANCHE = 7
 # Jours ouvrés du guichet et des agents : lundi à samedi, sans jours fériés (cadrage, I1).
 JOURS_OUVRES = frozenset({1, 2, 3, 4, 5, 6})
@@ -211,8 +215,8 @@ def evaluer_volume(jour: date, volumes: Mapping[date, int | None]) -> Resume:
       × facteur de tendance sur 7 jours ;
     - dernier jour ouvré du mois : fin de mois précédente × facteur de tendance sur 28 jours.
     Hors de [50 % ; 200 %] de la référence : AVERTISSEMENT. Historique insuffisant (moins de
-    4 semaines, aucune fin de mois précédente, jour non ingéré) : pas de contrôle. Un dimanche
-    à 0 est normal.
+    4 semaines, aucune fin de mois précédente, jour non ingéré) ou référence inférieure à
+    VOLUME_REFERENCE_MIN opérations (K11) : pas de contrôle. Un dimanche à 0 est normal.
     """
     nb_jour = volumes.get(jour) or 0
 
@@ -233,6 +237,12 @@ def evaluer_volume(jour: date, volumes: Mapping[date, int | None]) -> Resume:
     except _HistoriqueIncomplet as manque:
         return resume(SUCCES, f"historique insuffisant ({manque}) : pas de contrôle")
     reference = base * facteur
+    if reference < VOLUME_REFERENCE_MIN:
+        message = (
+            f"référence de {reference:.1f} opérations, inférieure à {VOLUME_REFERENCE_MIN} : "
+            "pas de contrôle"
+        )
+        return resume(SUCCES, message, {"reference": round(reference, 2)})
     ratio = (nb_jour / reference) if reference else (float("inf") if nb_jour else 1.0)
     nature = "fin de mois" if fin_de_mois else "jour ordinaire"
     details = {

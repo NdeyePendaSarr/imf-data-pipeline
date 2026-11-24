@@ -5,7 +5,11 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
 from airflow.dag_processing.dagbag import DagBag
+
+# Demande Airflow installé : conteneur seulement (make test-airflow), jamais en CI.
+pytestmark = pytest.mark.airflow
 
 DOSSIER_DAGS = Path(__file__).resolve().parents[1] / "dags"
 

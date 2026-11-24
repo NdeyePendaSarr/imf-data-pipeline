@@ -1,0 +1,100 @@
+# Intégration continue (phase 9) : lint, types, données générées, ingestion, dbt build et pytest
+# sur un PostgreSQL éphémère. Cible dbt `dev` (PostgreSQL) seulement ; BigQuery viendra ensuite.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Un seul run par branche : un nouveau push annule le run en cours.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Connexion par les variables POSTGRES_* (J20), comme dbt, l'ingestion et pytest ; pas de .env.
+    env:
+      POSTGRES_USER: imf_ci
+      # Mot de passe jetable, propre à la CI : il ne protège qu'un conteneur détruit en fin de job
+      # et ne sert nulle part ailleurs. Ce n'est pas un secret.
+      POSTGRES_PASSWORD: ci_jetable_non_secret
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB_OPS: imf_ops
+      POSTGRES_DB_DWH: imf_dwh
+
+    services:
+      postgres:
+        # Même version majeure que docker-compose.yml (postgres:17).
+        image: postgres:17
+        # Le contexte env n'est pas disponible dans un service : valeurs recopiées de env ci-dessus.
+        env:
+          POSTGRES_USER: imf_ci
+          POSTGRES_PASSWORD: ci_jetable_non_secret
+          POSTGRES_DB: imf_dwh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imf_ci -d imf_dwh"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Un service ne lance pas docker-entrypoint-initdb.d : on applique le script d'init du dépôt
+      # (base imf_ops, schémas bronze / silver / gold de imf_dwh).
+      - name: Initialisation des bases (docker/postgres/init)
+        env:
+          PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        run: |
+          until pg_isready -h localhost -p 5432 -U "$POSTGRES_USER" -d imf_dwh; do sleep 1; done
+          for script in docker/postgres/init/*.sql; do
+            psql -h localhost -p 5432 -U "$POSTGRES_USER" -d imf_dwh -v ON_ERROR_STOP=1 -f "$script"
+          done
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Dépendances (uv sync --frozen)
+        run: uv sync --frozen
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run ruff format --check .
+
+      - name: Types (mypy)
+        run: uv run mypy
+
+      - name: Données (make generate)
+        run: make generate
+
+      - name: Ingestion bronze (make ingest-all)
+        run: make ingest-all
+
+      # dbt appelé directement : les cibles dbt du Makefile lisent le .env (uv --env-file).
+      - name: Packages dbt (dbt deps)
+        run: uv run dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: dbt build (cible dev)
+        run: uv run dbt build --project-dir dbt --profiles-dir dbt --target dev
+
+      # Après dbt build, comme make check : les tests de vérité lisent le silver et le gold.
+      # Les tests marqués airflow (DagBag, reprise) ne tournent que dans le conteneur Airflow.
+      - name: Tests (pytest)
+        run: uv run pytest -m "not airflow"

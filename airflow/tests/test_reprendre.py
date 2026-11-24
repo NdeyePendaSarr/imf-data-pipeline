@@ -8,6 +8,9 @@ from types import ModuleType
 
 import pytest
 
+# Demande Airflow installé (reprendre.py importe airflow) : conteneur seulement, jamais en CI.
+pytestmark = pytest.mark.airflow
+
 CHEMIN = Path(__file__).resolve().parents[1] / "reprendre.py"
 JOUR = date(2025, 2, 12)
 

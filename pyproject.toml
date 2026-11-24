@@ -64,4 +64,5 @@ addopts = "--strict-markers"
 markers = [
     "integration: tests nécessitant le PostgreSQL du projet (make up)",
     "slow: tests longs sur la configuration par défaut (exclus de make test)",
+    "airflow: tests lancés dans le conteneur Airflow (make test-airflow), exclus de la CI",
 ]

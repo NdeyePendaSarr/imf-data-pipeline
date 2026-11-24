@@ -1,12 +1,14 @@
 # SenFinance Microcrédit – pipeline de données & états financiers
 
+[![CI](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/workflows/ci.yml)
+
 > **EN —** End-to-end ELT pipeline for a fictional Senegalese microfinance institution: synthetic
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30), orchestrated by
 > Airflow and shown in a Power BI dashboard. Work in progress.
 
-> 🚧 **Projet en construction** — phase 8 terminée (dashboard Power BI), prochaine étape : CI,
-> documentation et entrepôt cloud.
+> 🚧 **Projet en construction** — phase 9 en cours : CI GitHub Actions en place, entrepôt cloud
+> (BigQuery) à venir.
 
 ## Objectif
 
@@ -32,7 +34,16 @@ remboursements, charges) en :
 | 6 | Balances, états financiers, KPI, rapprochements | ✅ |
 | 7 | Orchestration Airflow | ✅ |
 | 8 | Dashboard Power BI | ✅ |
-| 9 | CI, documentation, entrepôt cloud | ⬜ |
+| 9 | CI, documentation, entrepôt cloud | 🚧 |
+
+Phase 9 en cours :
+
+- **CI GitHub Actions** (`.github/workflows/ci.yml`, à chaque push et pull request vers `main`) :
+  PostgreSQL 17 éphémère, ruff, mypy, données générées, ingestion de l'exercice, `dbt build`
+  (450 PASS) et pytest (208 tests, hors tests Airflow lancés dans leur conteneur), en **104 s**.
+- **Correctif K11 du contrôle de volume** : pas de contrôle quand la référence est inférieure à
+  20 opérations (dimanches à petit effectif). Rejoué sur 2025 : **323 jours contrôlés,
+  0 avertissement**, ratios de **71 % à 148 %** (avant : 331 jours, ratios jusqu'à 198 %).
 
 ## Architecture (cible)
 

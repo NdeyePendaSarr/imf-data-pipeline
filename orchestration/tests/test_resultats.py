@@ -17,6 +17,7 @@ from orchestration.resultats import (
     ECHEC_TECHNIQUE,
     NON_EXECUTE,
     SUCCES,
+    VOLUME_REFERENCE_MIN,
     Resume,
     est_dernier_jour_ouvre,
     evaluer_completude,
@@ -196,6 +197,46 @@ def test_volume_plage(jour: date, nb: int, statut: str) -> None:
     resume = evaluer_volume(jour, volumes)
     assert (resume.statut, resume.code) == (statut, CODE_SUCCES)
     assert (resume.details["reference"], resume.details["facteur_tendance"]) == (100.0, 1.0)
+
+
+DIMANCHE_16_02 = date(2025, 2, 16)
+
+
+@pytest.mark.parametrize(
+    ("reference", "jour", "nb"),
+    [(8, DIMANCHE_16_02, 16), (19, JOUR, 57)],
+    ids=["reference_8_dimanche_16_02", "reference_19"],
+)
+def test_volume_reference_trop_faible_pas_de_controle(reference: int, jour: date, nb: int) -> None:
+    """K11 : référence < 20 → pas de contrôle (même statut que sans historique), même à 200 % et
+    plus (16 pour 8, comme le 16/02/2025 ; 57 pour 19, soit 300 %)."""
+    assert VOLUME_REFERENCE_MIN == 20
+    volumes = serie_plate(reference)
+    volumes[jour] = nb
+    resume = evaluer_volume(jour, volumes)
+    assert (resume.statut, resume.code) == (SUCCES, CODE_SUCCES)
+    assert "pas de contrôle" in resume.message
+    assert resume.details == {"reference": float(reference)}
+    assert "ratio" not in resume.details
+
+
+def test_volume_reference_20_controle_normal() -> None:
+    """Référence = 20 : contrôle normal (ratio calculé, dans la plage)."""
+    volumes = serie_plate(20)
+    volumes[JOUR] = 25
+    resume = evaluer_volume(JOUR, volumes)
+    assert resume.statut == SUCCES and "pas de contrôle" not in resume.message
+    assert (resume.details["reference"], resume.details["ratio"]) == (20.0, 1.25)
+
+
+@pytest.mark.parametrize("nb", [9, 41], ids=["sous_50", "au_dela_200"])
+def test_volume_reference_20_hors_plage_avertissement(nb: int) -> None:
+    """Référence ≥ 20 et volume hors de [50 % ; 200 %] : avertissement inchangé, sortie 0."""
+    volumes = serie_plate(20)
+    volumes[JOUR] = nb
+    resume = evaluer_volume(JOUR, volumes)
+    assert (resume.statut, resume.code) == (AVERTISSEMENT, CODE_SUCCES)
+    assert resume.details["reference"] == 20.0
 
 
 # --- complétude ------------------------------------------------------------------------------
