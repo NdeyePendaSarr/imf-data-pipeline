@@ -1,6 +1,6 @@
 # P1 – Phase 4 : silver dbt (cadrage v0.2 et bilan, 21/11/2026)
 
-> Complète le PRD v1.5 et `docs/cadrage/P1_phase3_cadrage.md`. Critère de fin : `dbt build` vert sur silver **et** silver nettoyé = `data/_verite/` (pytest), `make check` vert. Partie Claude Code atteinte le 21/11/2026 ; reste : les deux tests relus par Ndeye Penda (§3), puis push.
+> Complète le PRD v1.5 et `docs/cadrage/P1_phase3_cadrage.md`. Critère de fin : `dbt build` vert sur silver **et** silver nettoyé = `data/_verite/` (pytest), `make check` vert. Partie développement atteinte le 21/11/2026 ; reste : les deux tests relus par Ndeye Penda (§3), puis push.
 
 ## 1. Décisions
 
@@ -51,5 +51,5 @@ Limite à dire en entretien : le catalogue prouve les règles sur des défauts c
 
 - **Trou dans I12** : la correction S16 ne changeait que `imf_ops`, et l'empreinte de génération est restée identique ; l'ingestion n'aurait rien détecté (reset manuel). L'empreinte doit couvrir le contenu de `imf_ops` (hash par table) ou une version du générateur.
 - Vérifier que 74 515 = 66 514 + 3 000 décaissements + 3 000 frais de dossier + nombre de remboursements PRELEVEMENT (attendu : 2 001).
-- Les cadrages ne sont pas dans le dépôt (Claude Code les lit dans Downloads) ; à ranger dans `docs/` au plus tard en phase 9.
+- Les cadrages ne sont pas encore dans le dépôt ; à ranger dans `docs/` au plus tard en phase 9.
 - `.env` : ajouter `POSTGRES_DB_DWH=imf_dwh`.

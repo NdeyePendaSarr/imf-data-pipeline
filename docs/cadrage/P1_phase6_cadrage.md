@@ -18,7 +18,7 @@
 | H1 | fct_portefeuille_quotidien en **jours calendaires** (colonne est_jour_ouvre) ; convention « échue » = date prévue ≤ jour, partout | Un encours est un stock ; retard en jours calendaires ; pas de cas particulier pour les fins de mois du dimanche. Empreinte MD5 inchangée après alignement |
 | H2 | Cas chiffré → dbt unit tests, un par mart, attendus calculés à la main, jamais modifiés pour faire passer un test | Un unit test dbt teste un modèle ; l'attendu est l'oracle |
 | H3 | PRD v1.6 en fin de phase 6 | Une seule réécriture |
-| H4 | docs/cadrage/ dès la phase 6, en **version publique allégée** ; la version complète reste la source de vérité | Claude Code doit trouver les cadrages ; seul le contenu du projet est publié |
+| H4 | docs/cadrage/ dès la phase 6, en **version publique allégée** ; la version complète reste la source de vérité | Les cadrages vivent avec le code qu'ils décrivent ; seul le contenu du projet est publié |
 | H5 | Balance 6 colonnes ; ouverture de janvier = 0 ; l'apport en capital est un mouvement de janvier | Première année |
 | H6 | Densification compte × agence × mois dès le premier mouvement ; rubriques mouvementées × 12 mois au compte de résultat | Un compte sans mouvement garde son solde |
 | H7 | Bilan au niveau IMF, soldes calculés sur les **mouvements agrégés**, jamais en sommant les soldes d'agence | Banque créditée dans l'agence approvisionnée (G6) ; test à deux agences ajouté |

@@ -44,7 +44,7 @@ Chiffres de la phase 9, sur des runs réels :
 
 | Contrôle | Résultat |
 |---|---|
-| CI PostgreSQL (chaque push et pull request vers `main`) | [run 45395881197](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45395881197) : **75 s**, `dbt build` 457 PASS, 227 tests pytest |
+| CI PostgreSQL (chaque push et pull request vers `main`) | [run 45399031578](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45399031578) : job principal **109 s** (`dbt build` 457 PASS, 227 tests pytest, docs dbt) + publication sur GitHub Pages **26 s** |
 | Job BigQuery (manuel, fédération d'identité) | [run 45396166776](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45396166776) : **351 s**, 457 PASS sur BigQuery, comparaison **71 mesures, 0 écart** |
 | `make rebuild-bq` sur le poste | ≈ 4 min 30 : chargement du bronze, `dbt build --target bq`, comparaison, 0 écart |
 | Tests | 457 nœuds dbt (388 tests de données, 10 unitaires, 7 tests de macros, 6 seeds, 46 modèles) ; 227 tests pytest |

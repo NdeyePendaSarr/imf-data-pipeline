@@ -35,7 +35,7 @@ Hors périmètre : Airflow sur BigQuery ; DagBag dans la CI ; run du DAG en phas
 |---|---|---|---|
 | 0. Inventaire | Matérialisations, SQL propre à PostgreSQL, taille, types | Tableau des écarts | ✅ `docs/phase9/inventaire_bq.md` (`aee9820`, complété dans `af40f42`) |
 | 1. K11 | Seuil de référence 20 | `make check` vert ; gold inchangé | ✅ (`aee9820`) : 323 jours contrôlés, 0 avertissement, ratios 71 % à 148 % |
-| 2. CI PostgreSQL | GitHub Actions | Badge vert sur `main` | ✅ (`aee9820`) ; dernier run sur `main` : 45395881197, 75 s |
+| 2. CI PostgreSQL | GitHub Actions | Badge vert sur `main` | ✅ (`aee9820`) ; dernier run sur `main` (`a9a85fd`) : 45399031578, job principal 109 s + publication des docs dbt 26 s |
 | 3a–3d. Portage BigQuery | Chargeur, profil, silver, gold | Build bq complet vert ; L3 sans écart au 31/12 et au 15/03 | ✅ (`af40f42`) : 457 PASS sur bq et dev |
 | 4a. Rebuild et preuve versionnée | `make rebuild-bq`, `make compare-moteurs` | Entrepôt recréé en une commande, 0 écart | ✅ (`af40f42`) : 4 min 28 s à 5 min 07 s en local |
 | 4b. Job CI BigQuery | `bigquery.yml`, fédération d'identité | Run manuel vert sur `main` sans clé JSON, 0 écart | ✅ : premier run 45393283643 en échec (audit absent de la CI) → correctif L15 `b705301` → **run 45396166776 vert, 351 s** (authentification 0 s ; generate 5 s ; ingest 6 s ; dbt dev 19 s ; `rebuild-bq SANS_AUDIT=1` 290 s : 14 tables en 64,5 s, 457 PASS, **71 mesures, 0 écart**) ; audit BigQuery toujours à 3 201 lignes ; `make check` 457 PASS, **227 pytest** |

@@ -51,4 +51,4 @@ Lignes de REMBOURSEMENT : 11 684 lignes de trésorerie (caisse 3 674, mobile 3 9
 2. **Commissions mobile money de décembre** : facturées en m+1 par le générateur, donc absentes de l'exercice (11 pièces, février à décembre). Limite à écrire dans le README (pas de charges à payer).
 3. **243 remboursements sans intérêts** : vérifier l'ordre d'imputation du générateur (pénalités → intérêts → capital est l'usage) et documenter.
 4. **Second cas chiffré** (cadrage phase 0 §4, avec l'approvisionnement de 200 000) : **calculé à la main**. Il couvre écritures, balance, rapprochements et bilan : il devient le test unitaire des marts.
-5. Ranger les cadrages dans le dépôt (docs/) pour que Claude Code les trouve.
+5. Ranger les cadrages dans le dépôt (docs/), à côté du code qu'ils décrivent.

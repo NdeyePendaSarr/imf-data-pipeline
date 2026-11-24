@@ -33,7 +33,7 @@ Point à défendre : les runs `imf_ops` sont **cumulatifs**. Un premier run au 3
 
 ## 3. Leçons
 
-- Une explication de Claude Code qui contredit une règle n'est pas une preuve : les « 3 569 lignes du 31/12 » avaient été justifiées à tort. Tout chiffre surprenant se justifie par une requête.
+- Une explication non vérifiée qui contredit une règle n'est pas une preuve : les « 3 569 lignes du 31/12 » avaient été justifiées à tort. Tout chiffre surprenant se justifie par une requête.
 - Test de mutation manuel : casser la règle testée et vérifier que le test échoue.
 
 ## 4. À surveiller (phases 4 à 6)
