@@ -64,14 +64,18 @@ mensuel as (
 )
 
 select
-    cast(date_fin_mois as date) as date_fin_mois,
-    cast(rubrique as text) as rubrique,
-    cast(type_rubrique as text) as type_rubrique,
-    cast(case when type_rubrique = 'CHARGES' then -resultat_mois else resultat_mois end as bigint)
+    cast(m.date_fin_mois as date) as date_fin_mois,
+    cast(m.rubrique as text) as rubrique,
+    -- Libellé d'affichage (K14, seed de présentation) ; jointure externe : un libellé manquant
+    -- est signalé par le test not_null au lieu de faire disparaître la ligne.
+    cast(l.libelle as text) as libelle_rubrique,
+    cast(m.type_rubrique as text) as type_rubrique,
+    cast(case when m.type_rubrique = 'CHARGES' then -m.resultat_mois else m.resultat_mois end as bigint)
         as montant_mois,
-    cast(case when type_rubrique = 'CHARGES' then -resultat_cumul else resultat_cumul end as bigint)
+    cast(case when m.type_rubrique = 'CHARGES' then -m.resultat_cumul else m.resultat_cumul end as bigint)
         as montant_cumul,
-    cast(resultat_mois as bigint) as resultat_mois,
-    cast(resultat_cumul as bigint) as resultat_cumul,
-    cast(least(date_fin_mois, {{ date_arrete() }}) as date) as date_situation
-from mensuel
+    cast(m.resultat_mois as bigint) as resultat_mois,
+    cast(m.resultat_cumul as bigint) as resultat_cumul,
+    cast(least(m.date_fin_mois, {{ date_arrete() }}) as date) as date_situation
+from mensuel as m
+left join {{ ref('rubriques_etats') }} as l on l.rubrique = m.rubrique

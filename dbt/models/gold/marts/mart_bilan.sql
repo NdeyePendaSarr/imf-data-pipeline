@@ -95,20 +95,24 @@ postes as (
 )
 
 select
-    cast(date_fin_mois as date) as date_fin_mois,
+    cast(p.date_fin_mois as date) as date_fin_mois,
     -- Actif par code de rubrique, puis passif : capitaux propres, résultat, puis dettes.
     -- Tri sur le préfixe (A1, A2, P1…) ; le résultat suit P1 (capitaux propres). Indépendant de la
     -- collation de la base.
     cast(row_number() over (
-        partition by date_fin_mois
+        partition by p.date_fin_mois
         order by
-            cote,
-            case when rubrique = 'RESULTAT_CUMULE' then 'P1' else substr(rubrique, 1, 2) end,
-            rubrique = 'RESULTAT_CUMULE',
-            rubrique
+            p.cote,
+            case when p.rubrique = 'RESULTAT_CUMULE' then 'P1' else substr(p.rubrique, 1, 2) end,
+            p.rubrique = 'RESULTAT_CUMULE',
+            p.rubrique
     ) as integer) as ordre,
-    cast(cote as text) as cote,
-    cast(rubrique as text) as rubrique,
-    cast(montant as bigint) as montant,
-    cast(least(date_fin_mois, {{ date_arrete() }}) as date) as date_situation
-from postes
+    cast(p.cote as text) as cote,
+    cast(p.rubrique as text) as rubrique,
+    -- Libellé d'affichage (K14, seed de présentation) ; jointure externe : un libellé manquant
+    -- est signalé par le test not_null au lieu de faire disparaître la ligne.
+    cast(l.libelle as text) as libelle_rubrique,
+    cast(p.montant as bigint) as montant,
+    cast(least(p.date_fin_mois, {{ date_arrete() }}) as date) as date_situation
+from postes as p
+left join {{ ref('rubriques_etats') }} as l on l.rubrique = p.rubrique

@@ -156,6 +156,11 @@ unit_tests:
           - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 100000}
           - {date_ecriture: 2025-02-15, code_compte: TRESO_CAISSE, id_agence: AG_TEST, debit: 200000, credit: 0}
           - {date_ecriture: 2025-02-15, code_compte: TRESO_BANQUE, id_agence: AG_TEST, debit: 0, credit: 200000}
+      - input: ref('rubriques_etats')
+        rows:
+          - {rubrique: R1_PRODUITS_FINANCIERS, libelle: Produits financiers}
+          - {rubrique: R2_COMMISSIONS, libelle: Commissions}
+          - {rubrique: R4_CHARGES_GENERALES, libelle: "Charges générales d'exploitation"}
     expect:
       rows:
         - {date_fin_mois: 2025-01-31, rubrique: R1_PRODUITS_FINANCIERS, type_rubrique: PRODUITS, montant_mois: 5000, montant_cumul: 5000, resultat_mois: 5000, resultat_cumul: 5000}

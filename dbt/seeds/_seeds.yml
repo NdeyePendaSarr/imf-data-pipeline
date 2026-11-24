@@ -29,6 +29,22 @@ seeds:
         priorite: integer
         regle: text
         type_evenement: text
+  - name: rubriques_etats
+    description: >
+      Libellés d'affichage des rubriques du bilan et du compte de résultat (K14, phase 8).
+      Présentation seulement, pas de mapping comptable : un changement de libellé n'incrémente
+      pas version_mapping.
+    config:
+      column_types:
+        rubrique: text
+        libelle: text
+    columns:
+      - name: rubrique
+        description: Code de rubrique (plan de comptes, ou RESULTAT_CUMULE pour le bilan).
+        data_tests: [unique, not_null]
+      - name: libelle
+        description: Libellé affiché dans les états financiers (UTF-8, accents et apostrophes).
+        data_tests: [not_null]
   - name: canaux_autorises
     description: Canaux autorisés par source (D16) ; un canal absent → motif CANAL_NON_AUTORISE.
     columns:

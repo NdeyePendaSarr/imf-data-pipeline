@@ -65,6 +65,14 @@ unit_tests:
           - {date_fin_mois: 2025-02-28, rubrique: R1_PRODUITS_FINANCIERS, resultat_cumul: 10000}
           - {date_fin_mois: 2025-02-28, rubrique: R2_COMMISSIONS, resultat_cumul: 6000}
           - {date_fin_mois: 2025-02-28, rubrique: R4_CHARGES_GENERALES, resultat_cumul: -100000}
+      - input: ref('rubriques_etats')
+        rows: &libelles_bilan
+          - {rubrique: A1_CREDITS_CLIENTELE, libelle: "Crédits à la clientèle"}
+          - {rubrique: A2_TRESORERIE, libelle: "Trésorerie"}
+          - {rubrique: P1_CAPITAUX_PROPRES, libelle: "Capitaux propres"}
+          - {rubrique: P2_DEPOTS_CLIENTELE, libelle: "Dépôts de la clientèle"}
+          - {rubrique: P3_DETTES_TRESORERIE, libelle: "Dettes de trésorerie"}
+          - {rubrique: RESULTAT_CUMULE, libelle: "Résultat de l'exercice"}
     expect:
       rows:
         - {date_fin_mois: 2025-01-31, ordre: 1, cote: ACTIF, rubrique: A1_CREDITS_CLIENTELE, montant: 275000}
@@ -118,6 +126,8 @@ unit_tests:
           - {date_ecriture: 2025-01-20, code_compte: TRESO_LIAISON_AGENT, id_agence: AG_B, debit: 0, credit: 50000}
       - input: ref('mart_compte_resultat')
         rows: []
+      - input: ref('rubriques_etats')
+        rows: *libelles_bilan
     expect:
       rows:
         - {date_fin_mois: 2025-01-31, ordre: 1, cote: ACTIF, rubrique: A1_CREDITS_CLIENTELE, montant: 0}

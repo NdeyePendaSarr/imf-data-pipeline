@@ -1,0 +1,56 @@
+{
+  "name": "SenFinance",
+  "dataColors": [
+    "#0B5C8A",
+    "#5E7186",
+    "#3B8FB8",
+    "#768A9C",
+    "#20405E",
+    "#6E8FA3",
+    "#4A5A6A",
+    "#2D7396"
+  ],
+  "foreground": "#1E2A36",
+  "foregroundNeutralSecondary": "#4A5866",
+  "foregroundNeutralTertiary": "#5E6B78",
+  "background": "#FFFFFF",
+  "backgroundLight": "#F4F6F8",
+  "backgroundNeutral": "#D5DCE3",
+  "tableAccent": "#0B5C8A",
+  "good": "#0B5C8A",
+  "neutral": "#5E7186",
+  "bad": "#B42318",
+  "maximum": "#0B5C8A",
+  "center": "#768A9C",
+  "minimum": "#D5DCE3",
+  "null": "#768A9C",
+  "hyperlink": "#0B5C8A",
+  "visitedHyperlink": "#20405E",
+  "textClasses": {
+    "callout": { "fontSize": 28, "fontFace": "Segoe UI Semibold", "color": "#1E2A36" },
+    "title": { "fontSize": 14, "fontFace": "Segoe UI Semibold", "color": "#1E2A36" },
+    "header": { "fontSize": 12, "fontFace": "Segoe UI Semibold", "color": "#1E2A36" },
+    "label": { "fontSize": 10, "fontFace": "Segoe UI", "color": "#4A5866" }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [{ "show": true, "color": { "solid": { "color": "#FFFFFF" } }, "transparency": 0 }],
+        "border": [{ "show": true, "color": { "solid": { "color": "#D5DCE3" } }, "radius": 4 }],
+        "title": [{ "show": true, "fontColor": { "solid": { "color": "#1E2A36" } }, "fontSize": 12 }],
+        "dropShadow": [{ "show": false }]
+      }
+    },
+    "page": {
+      "*": {
+        "background": [{ "color": { "solid": { "color": "#F4F6F8" } }, "transparency": 0 }]
+      }
+    },
+    "card": {
+      "*": {
+        "labels": [{ "color": { "solid": { "color": "#1E2A36" } }, "fontSize": 28 }],
+        "categoryLabels": [{ "color": { "solid": { "color": "#4A5866" } }, "fontSize": 10 }]
+      }
+    }
+  }
+}

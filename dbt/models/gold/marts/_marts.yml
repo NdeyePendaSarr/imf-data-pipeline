@@ -91,6 +91,15 @@ models:
       - name: rubrique
         data_type: text
         description: Rubrique du compte de résultat (R1 à R6 du plan de comptes).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('rubriques_etats')
+                field: rubrique
+      - name: libelle_rubrique
+        data_type: text
+        description: Libellé d'affichage de la rubrique (seed rubriques_etats, K14).
         data_tests: [not_null]
       - name: type_rubrique
         data_type: text
@@ -157,6 +166,15 @@ models:
       - name: rubrique
         data_type: text
         description: Rubrique du bilan, ou RESULTAT_CUMULE.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('rubriques_etats')
+                field: rubrique
+      - name: libelle_rubrique
+        data_type: text
+        description: Libellé d'affichage de la rubrique (seed rubriques_etats, K14).
         data_tests: [not_null]
       - name: montant
         data_type: bigint

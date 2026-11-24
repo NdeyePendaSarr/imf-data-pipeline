@@ -2,10 +2,11 @@
 
 > **EN —** End-to-end ELT pipeline for a fictional Senegalese microfinance institution: synthetic
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
-> monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30). Work in progress.
+> monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30), orchestrated by
+> Airflow and shown in a Power BI dashboard. Work in progress.
 
-> 🚧 **Projet en construction** — phase 7 terminée (orchestration Airflow, exercice 2025 rejoué
-> jour par jour), prochaine étape : dashboard Power BI.
+> 🚧 **Projet en construction** — phase 8 terminée (dashboard Power BI), prochaine étape : CI,
+> documentation et entrepôt cloud.
 
 ## Objectif
 
@@ -30,7 +31,7 @@ remboursements, charges) en :
 | 5 | Schéma en étoile et écritures comptables (gold) | ✅ |
 | 6 | Balances, états financiers, KPI, rapprochements | ✅ |
 | 7 | Orchestration Airflow | ✅ |
-| 8 | Dashboard Power BI | ⬜ |
+| 8 | Dashboard Power BI | ✅ |
 | 9 | CI, documentation, entrepôt cloud | ⬜ |
 
 ## Architecture (cible)
@@ -49,8 +50,8 @@ Générateur Python ──► CSV d'agences + base opérationnelle (imf_ops)
 
 | | Outils |
 |---|---|
-| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt_utils) · Apache Airflow 3.3 |
-| **Prévu** | Power BI · GitHub Actions |
+| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt_utils) · Apache Airflow 3.3 · Power BI Desktop |
+| **Prévu** | GitHub Actions |
 
 ## Lancer le projet
 
@@ -296,7 +297,7 @@ Résultats sur l'exercice par défaut :
 | Taux de remboursement au 31/12 | 999 172 879 / 1 039 096 786 XOF = 96,16 % (paiements anticipés non comptés) |
 | Rapprochements | 120 lignes (12 mois × 5 agences × 2 contrôles), écart 0 partout |
 | Lignes des marts | balance 879, compte de résultat 48, bilan 72, rapprochements 120, KPI 5 283 |
-| `make check` (état actuel, phase 7) | `dbt build` : 442 PASS, 0 WARN, 0 ERROR (381 tests de données, 10 tests unitaires, dont les cas chiffrés calculés à la main de `docs/cadrage/P1_cas_chiffres_tests.md`) ; 203 tests pytest |
+| `make check` (état actuel, phase 8) | `dbt build` : 450 PASS, 0 WARN, 0 ERROR (388 tests de données, 10 tests unitaires dont les cas chiffrés calculés à la main de `docs/cadrage/P1_cas_chiffres_tests.md`, 6 seeds, 46 modèles) ; 203 tests pytest |
 
 ## Arrêté intermédiaire
 
@@ -506,9 +507,17 @@ révélée pessimiste : voir ci-dessous.
 ### Backfill de l'exercice 2025
 
 Le gold de référence est d'abord calculé en une fois, bronze complet et `dbt build` par défaut :
-`make empreinte-gold FICHIER=docs/phase7/empreinte_gold_reference_31_12.txt`. Puis, depuis un
-état propre (`make reset-bronze`, runs du DAG supprimés par `airflow dags delete` pour que
-chaque jour s'exécute réellement, tentatives à 1 ; l'audit, en ajout seul, est conservé) :
+`make empreinte-gold FICHIER=docs/phase7/empreinte_gold_reference_31_12.txt`.
+
+> **Référence de la phase 7, à ne pas régénérer.** L'égalité entre le gold du backfill et ce
+> fichier valait au commit `c0f220f`. La phase 8 a ensuite ajouté `libelle_rubrique` (K14) à
+> `mart_bilan` et `mart_compte_resultat` : les empreintes de ces deux tables changent (mêmes
+> lignes, mêmes montants), les 17 autres sont identiques. La référence du gold actuel est
+> `docs/phase8/empreinte_gold_reference_31_12.txt`.
+
+Puis, depuis un état propre (`make reset-bronze`, runs du DAG supprimés par `airflow dags delete`
+pour que chaque jour s'exécute réellement, tentatives à 1 ; l'audit, en ajout seul, est
+conservé) :
 
 ```bash
 docker compose --profile airflow exec airflow-scheduler airflow backfill create \
@@ -521,7 +530,7 @@ Résultat, sans aucune intervention :
 | Contrôle | Résultat |
 |---|---|
 | Runs | 365 lignes `RUN` en `SUCCES`, chaque étape à la tentative 1 (2 555 lignes d'audit) |
-| Gold au 31/12 | `make compare-empreintes` : identique à la référence sur les 19 tables |
+| Gold au 31/12 | `make compare-empreintes` : identique à la référence sur les 19 tables, au commit `c0f220f` (voir la note ci-dessous) |
 | Bilan au 31/12 | actif = passif = **2 119 584 054 XOF** |
 | Résultat de l'exercice | **−333 130 376 XOF** |
 | PAR 30 au 31/12 | 92 511 316 / 1 850 520 623 = **4,9992 %** |
@@ -555,11 +564,50 @@ démarrage (1 066 Mio avec le PostgreSQL du projet), 928 Mio après un `dbt buil
 scheduler, où tournent les tâches : 455 Mio pendant `verifier_environnement`, **545 Mio** pendant
 un `dbt build` complet (pic mesuré par le cgroup), soit 53 % de sa limite d'alors (1 Gio).
 
+## Dashboard Power BI (phase 8)
+
+Trois pages en mode Import sur le gold et `audit.audit_runs` (`dashboard/senfinance_dashboard.pbix`) :
+pilotage du portefeuille, états financiers, qualité et fraîcheur. Power BI se connecte au
+conteneur (`localhost:5433`, base `imf_dwh`) avec le rôle en lecture seule `powerbi_lecteur`
+(`make powerbi-role`) ; connexion, tables, grains et colonnes : [`dashboard/modele_donnees.md`](dashboard/modele_donnees.md).
+Toutes les mesures DAX, avec leur formule et leur type : [`dashboard/mesures.md`](dashboard/mesures.md).
+
+**Deux dates (K1).** Le bandeau « Données arrêtées au » affiche la date réelle du gold
+(`date_situation` de `mart_bilan`), pas celle du dernier run : un `dbt build` lancé à la main
+n'écrit rien dans l'audit. Si cette date diffère du dernier run réussi de l'audit, ou si le
+dernier run a échoué, une alerte rouge s'affiche en tête de page.
+
+**Mesures semi-additives (K2).** Les stocks (encours, PAR 30, taux de remboursement, épargne,
+bilan) sont évalués au dernier jour qui a des données dans la période, le même pour toutes les
+agences et plafonné à la date du gold, jamais sommés dans le temps : un `SUM` de l'encours sur un
+mois le multiplierait par une trentaine. Les flux (opérations, résultat du mois) se somment ; les
+ratios sont recalculés par `DIVIDE` à chaque niveau.
+
+Au 31/12/2025, les chiffres de référence sont retrouvés : encours brut 1 850 520 623 XOF,
+PAR 30 4,9992 %, bilan 2 119 584 054 XOF, résultat −333 130 376 XOF, contrôles à 0.
+
+![Pilotage du portefeuille au 31/12/2025](dashboard/captures/pilotage_31_12.png)
+
+![États financiers au 31/12/2025](dashboard/captures/etats_financiers_31_12.png)
+
+![Qualité et fraîcheur au 31/12/2025](dashboard/captures/qualite_31_12.png)
+
+Test « à date » : gold reconstruit au 15/03/2025 par `dbt build --vars '{date_arrete: "2025-03-15"}'`,
+sans Airflow (l'audit reste inchangé). Le bandeau passe au 15/03 et l'alerte K1 signale l'écart
+avec le dernier run réussi, au 31/12 :
+
+![Qualité et fraîcheur, gold au 15/03/2025](dashboard/captures/qualite_15_03.png)
+
+Les autres captures au 15/03 sont dans [`dashboard/captures/`](dashboard/captures/). Retour au
+31/12 par un `dbt build` sans variable : gold identique à
+`docs/phase8/empreinte_gold_reference_31_12.txt` (19 tables).
+
 ## Structure actuelle
 
 ```
 ├── airflow/                # image Airflow, DAG imf_quotidien, reprise et tests d'intégrité
 ├── orchestration/          # commandes du DAG (contrôles, dbt, audit), sans Airflow, et leurs tests
+├── dashboard/              # Power BI : .pbix, captures, mesures DAX, modèle de données, thème, rôle de lecture
 ├── docker/postgres/init/   # création des bases et des schémas
 ├── dbt/                    # projet dbt : sources bronze, modèles et tests silver, seeds du cadrage
 ├── generator/              # générateur de données (vérité, anomalies, imf_ops) et ses tests

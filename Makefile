@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := help
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
 	ingest ingest-range ingest-all reset-bronze \
-	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes test-airflow \
+	dbt-deps dbt-build test-verite airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes powerbi-role test-airflow \
 	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
@@ -94,6 +94,13 @@ empreinte-gold: ## MD5 des 19 tables gold dans un fichier : make empreinte-gold 
 compare-empreintes: ## Compare deux empreintes gold (échec si différentes) : A=… B=…
 	@test -n "$(A)" -a -n "$(B)" || { echo "Usage : make compare-empreintes A=… B=…"; exit 2; }
 	uv run python -m orchestration.empreinte comparer $(A) $(B)
+
+# Power BI (phase 8) : rôle de lecture, mot de passe POWERBI_PASSWORD lu dans .env par uv.
+powerbi-role: ## Crée ou met à jour le rôle powerbi_lecteur (SELECT sur gold et audit)
+	@uv run --no-sync --env-file .env sh -c 'test -n "$$POWERBI_PASSWORD" || \
+		{ echo "POWERBI_PASSWORD absent ou vide dans .env" >&2; exit 2; }; \
+		docker compose exec -T -e POWERBI_PASSWORD postgres psql -U "$$POSTGRES_USER" \
+		-d "$${POSTGRES_DB_DWH:-imf_dwh}" -v ON_ERROR_STOP=1 -q -f - < dashboard/sql/role_lecture.sql'
 
 test-airflow: ## Tests d'intégrité des DAG, dans le conteneur Airflow
 	$(AIRFLOW) exec -T airflow-scheduler python -m pytest -q -p no:cacheprovider airflow/tests
