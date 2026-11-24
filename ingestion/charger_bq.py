@@ -14,9 +14,11 @@ DATETIME, pas TIMESTAMP : c'est une heure locale (date de l'événement à 20:00
 Projet et région lus dans l'environnement : BQ_PROJECT, BQ_LOCATION (L5 : région fixe, jamais
 changée ; un dataset existant dans une autre région fait échouer le chargement).
 
-    python -m ingestion.charger_bq        # make load-bq
+    python -m ingestion.charger_bq                 # make load-bq : 15 tables
+    python -m ingestion.charger_bq --sans-audit    # make load-bq SANS_AUDIT=1 : 14 (CI, L15)
 """
 
+import argparse
 import os
 import sys
 import time
@@ -55,6 +57,8 @@ TABLES: tuple[tuple[str, str], ...] = (
     ("audit", "audit_runs"),
 )
 DATASETS: tuple[str, ...] = tuple(dict.fromkeys(schema for schema, _ in TABLES))
+# Journal d'exécution d'Airflow : absent du PostgreSQL éphémère de la CI (L15, --sans-audit).
+SCHEMA_AUDIT = "audit"
 
 
 @dataclass(frozen=True)
@@ -139,9 +143,16 @@ def config_chargement(colonnes: list[Colonne]) -> bigquery.LoadJobConfig:
     return config
 
 
-def creer_datasets(client: bigquery.Client, projet: str, region: str) -> None:
+def tables_a_charger(sans_audit: bool) -> tuple[tuple[str, str], ...]:
+    """Les 15 tables, ou les 14 du bronze avec --sans-audit (L15 : la CI n'a pas d'audit)."""
+    return tuple(t for t in TABLES if not (sans_audit and t[0] == SCHEMA_AUDIT))
+
+
+def creer_datasets(
+    client: bigquery.Client, projet: str, region: str, datasets: tuple[str, ...] = DATASETS
+) -> None:
     """Crée les datasets dans la région demandée ; un dataset existant ailleurs : erreur (L5)."""
-    for nom in DATASETS:
+    for nom in datasets:
         dataset = bigquery.Dataset(f"{projet}.{nom}")
         dataset.location = region
         obtenu = client.create_dataset(dataset, exists_ok=True)
@@ -205,12 +216,22 @@ def charger_table(
 
 
 def charger(
-    client: bigquery.Client, projet: str, region: str, conn: psycopg.Connection[Any]
+    client: bigquery.Client,
+    projet: str,
+    region: str,
+    conn: psycopg.Connection[Any],
+    sans_audit: bool = False,
 ) -> list[tuple[str, int, int, float]]:
-    """Copie les 15 tables ; renvoie (table, lignes PostgreSQL, lignes BigQuery, secondes)."""
-    creer_datasets(client, projet, region)
+    """Copie les tables ; renvoie (table, lignes PostgreSQL, lignes BigQuery, secondes).
+
+    sans_audit : audit.audit_runs n'est ni lu ni chargé, et le dataset audit de BigQuery n'est
+    ni créé ni modifié (il garde la copie chargée depuis le poste). Sans l'option, une table
+    absente de PostgreSQL reste une erreur.
+    """
+    tables = tables_a_charger(sans_audit)
+    creer_datasets(client, projet, region, tuple(dict.fromkeys(s for s, _ in tables)))
     bilan = []
-    for schema, table in TABLES:
+    for schema, table in tables:
         debut = time.monotonic()
         colonnes = colonnes_pg(conn, schema, table)
         fichier, nb_pg = ecrire_parquet(conn, schema, table, colonnes, DOSSIER_PARQUET)
@@ -219,7 +240,15 @@ def charger(
     return bilan
 
 
-def main() -> int:
+def main(arguments: list[str] | None = None) -> int:
+    parseur = argparse.ArgumentParser(prog="python -m ingestion.charger_bq")
+    parseur.add_argument(
+        "--sans-audit",
+        action="store_true",
+        help="n'exclut que audit.audit_runs : le dataset audit de BigQuery n'est pas modifié "
+        "(CI : pas d'audit dans le PostgreSQL éphémère)",
+    )
+    sans_audit = parseur.parse_args(arguments).sans_audit
     load_dotenv()
     projet, region = os.getenv("BQ_PROJECT", ""), os.getenv("BQ_LOCATION", "")
     if not projet or not region:
@@ -231,7 +260,7 @@ def main() -> int:
         with psycopg.connect(
             **parametres_connexion(os.getenv("POSTGRES_DB_DWH", "imf_dwh"))
         ) as conn:
-            bilan = charger(client, projet, region, conn)
+            bilan = charger(client, projet, region, conn, sans_audit=sans_audit)
     except (ErreurIngestion, GoogleAPIError) as erreur:
         # Un load job refusé (schéma, type) lève une GoogleAPIError : message tel quel, sans
         # contournement.
@@ -240,6 +269,11 @@ def main() -> int:
     for table, nb_pg, nb_bq, secondes in bilan:
         print(f"{table:35} PostgreSQL {nb_pg:>7}  BigQuery {nb_bq:>7}  {secondes:5.1f} s")
     print(f"{len(bilan)} tables chargées en {time.monotonic() - debut:.1f} s, région {region}")
+    if sans_audit:
+        print(
+            f"--sans-audit : {SCHEMA_AUDIT}.audit_runs exclu ; dataset {SCHEMA_AUDIT} de BigQuery "
+            "non modifié (copie chargée depuis le poste)"
+        )
     return 0
 
 

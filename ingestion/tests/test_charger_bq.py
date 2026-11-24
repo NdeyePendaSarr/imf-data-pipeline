@@ -8,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import psycopg
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
@@ -20,6 +21,7 @@ from ingestion.charger_bq import (
     TABLES,
     Colonne,
     champ_bq,
+    charger,
     charger_table,
     config_chargement,
     creer_datasets,
@@ -191,9 +193,88 @@ def test_ecart_de_lignes_fait_echouer(tmp_path: Path) -> None:
         charger_table(_client(lignes_bq=0), f"{PROJET}.bronze.x", _parquet(tmp_path), COLONNES, 1)
 
 
+class ConnexionSansAudit:
+    """PostgreSQL éphémère de la CI : les 14 tables du bronze, pas de audit.audit_runs."""
+
+    def __init__(self) -> None:
+        self.lignes: list[tuple[Any, ...]] = []
+
+    def execute(self, requete: Any, parametres: tuple[str, str] | None = None) -> Any:
+        schema = parametres[0] if parametres else None
+        # information_schema.columns : une colonne pour le bronze, rien pour le schéma audit.
+        self.lignes = [] if schema == "audit" else [("id", "text", "text", None, None)]
+        return self
+
+    def fetchall(self) -> list[tuple[Any, ...]]:
+        return self.lignes
+
+
+def _charger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sans_audit: bool) -> Any:
+    """charger() avec la vraie lecture du catalogue ; Parquet écrit dans tmp_path (1 ligne)."""
+
+    def ecrire(conn: Any, schema: str, table: str, colonnes: Any, dossier: Path) -> Any:
+        fichier = tmp_path / f"{schema}.{table}.parquet"
+        pq.write_table(pa.table({"id": pa.array(["x"], type=pa.string())}), fichier)
+        return fichier, 1
+
+    monkeypatch.setattr(charger_bq, "ecrire_parquet", ecrire)
+    client = _client(lignes_bq=1)
+    bilan = charger(client, PROJET, "EU", ConnexionSansAudit(), sans_audit=sans_audit)  # type: ignore[arg-type]
+    return client, bilan
+
+
+def test_sans_audit_14_tables_et_dataset_audit_intouche(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """L15 : --sans-audit charge les 14 tables du bronze, sans aucun appel sur le dataset audit."""
+    client, bilan = _charger(tmp_path, monkeypatch, sans_audit=True)
+    assert len(bilan) == 14
+    assert all(table.startswith("bronze.") for table, *_ in bilan)
+    destinations = [dest for dest, _ in client.chargements]
+    assert len(destinations) == 14
+    assert not [d for d in destinations if ".audit." in d]
+    assert [d.dataset_id for d in client.datasets] == ["bronze"]
+
+
+def test_sans_option_table_audit_absente_echoue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sans l'option, comportement inchangé : audit.audit_runs absente de PostgreSQL = erreur."""
+    with pytest.raises(ErreurIngestion, match="table PostgreSQL introuvable : audit.audit_runs"):
+        _charger(tmp_path, monkeypatch, sans_audit=False)
+
+
+def test_option_sans_audit_en_ligne_de_commande(monkeypatch: pytest.MonkeyPatch) -> None:
+    """--sans-audit est une option explicite, désactivée par défaut."""
+    recu: list[bool] = []
+
+    def charger_simule(*args: Any, sans_audit: bool = False) -> list[Any]:
+        recu.append(sans_audit)
+        return []
+
+    class ConnexionVide:
+        def __enter__(self) -> "ConnexionVide":
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(charger_bq, "load_dotenv", lambda: None)
+    monkeypatch.setenv("BQ_PROJECT", PROJET)
+    monkeypatch.setenv("BQ_LOCATION", "EU")
+    monkeypatch.setenv("POSTGRES_USER", "u")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "p")
+    monkeypatch.setattr(bigquery, "Client", lambda **kwargs: object())
+    monkeypatch.setattr(psycopg, "connect", lambda **kwargs: ConnexionVide())
+    monkeypatch.setattr(charger_bq, "charger", charger_simule)
+    assert charger_bq.main(["--sans-audit"]) == 0
+    assert charger_bq.main([]) == 0
+    assert recu == [True, False]
+
+
 def test_main_sans_projet_ni_region(monkeypatch: pytest.MonkeyPatch) -> None:
     """Rien en dur : sans BQ_PROJECT / BQ_LOCATION, arrêt avant tout appel."""
     monkeypatch.setattr(charger_bq, "load_dotenv", lambda: None)
     monkeypatch.delenv("BQ_PROJECT", raising=False)
     monkeypatch.delenv("BQ_LOCATION", raising=False)
-    assert charger_bq.main() == 2
+    assert charger_bq.main([]) == 2

@@ -56,8 +56,9 @@ ingest-range: ## Ingère une période jour par jour : make ingest-range DU=… A
 ingest-all: ## Ingère tous les jours de l'exercice (rattrapage complet)
 	uv run python -m ingestion --exercice
 
-load-bq: ## Copie le bronze et audit_runs vers BigQuery (BQ_PROJECT, BQ_LOCATION du .env)
-	uv run $(ENV_FILE) python -m ingestion.charger_bq
+# SANS_AUDIT=1 : audit.audit_runs exclu, dataset audit de BigQuery inchangé (CI, L15).
+load-bq: ## Copie le bronze et audit_runs vers BigQuery (SANS_AUDIT=1 : sans audit_runs)
+	uv run $(ENV_FILE) python -m ingestion.charger_bq $(if $(SANS_AUDIT),--sans-audit,)
 
 reset-bronze: ## SUPPRIME le schéma bronze de imf_dwh puis le recrée vide
 	@echo "⚠️  ATTENTION : reset-bronze supprime toutes les données du schéma bronze (imf_dwh)."
@@ -82,7 +83,8 @@ test-verite: ## Compare chaque slv_* à data/_verite/ (prérequis : make ingest-
 compare-moteurs: ## Compare gold et silver PostgreSQL / BigQuery (L3) ; échec au moindre écart
 	uv run $(ENV_FILE) python -m scripts.comparer_moteurs
 
-rebuild-bq: ## Recharge le bronze dans BigQuery, dbt build --target bq, puis compare-moteurs
+# SANS_AUDIT, passé en ligne de commande, est transmis au make load-bq imbriqué (MAKEFLAGS).
+rebuild-bq: ## load-bq (SANS_AUDIT=1 possible), dbt build --target bq, puis compare-moteurs
 	@test -d dbt/dbt_packages/dbt_utils || $(MAKE) dbt-deps
 	$(MAKE) load-bq
 	$(DBT) build $(DBT_OPTIONS) --target bq

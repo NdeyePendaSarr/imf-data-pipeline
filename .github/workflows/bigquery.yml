@@ -95,7 +95,13 @@ jobs:
       - name: dbt build PostgreSQL (make dbt-build, cible dev)
         run: make dbt-build
 
-      # load-bq, dbt build --target bq, compare-moteurs. La comparaison écrit son tableau dans
-      # $GITHUB_STEP_SUMMARY (page du run) et fait échouer le job au moindre écart.
-      - name: Rebuild BigQuery et comparaison (make rebuild-bq)
-        run: make rebuild-bq
+      # L15 : pas d'audit dans le PostgreSQL éphémère ; l'audit BigQuery reste la copie du poste.
+      - name: Note sur l'audit (résumé du run)
+        run: |
+          echo "> L'audit BigQuery (\`audit.audit_runs\`) n'est pas rechargé par la CI (\`SANS_AUDIT=1\`) : c'est la copie chargée depuis le poste." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+      # load-bq (sans audit_runs), dbt build --target bq, compare-moteurs. La comparaison écrit
+      # son tableau dans $GITHUB_STEP_SUMMARY (page du run) et fait échouer le job au moindre écart.
+      - name: Rebuild BigQuery et comparaison (make rebuild-bq SANS_AUDIT=1)
+        run: make rebuild-bq SANS_AUDIT=1
