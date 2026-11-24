@@ -1,14 +1,18 @@
 # SenFinance Microcrédit – pipeline de données & états financiers
 
 [![CI](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/workflows/ci.yml)
+[![BigQuery](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/workflows/bigquery.yml/badge.svg)](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/workflows/bigquery.yml)
+[![Docs dbt](https://img.shields.io/badge/docs-dbt-FF694B)](https://ndeyependasarr.github.io/imf-data-pipeline/)
 
 > **EN —** End-to-end ELT pipeline for a fictional Senegalese microfinance institution: synthetic
 > operations → PostgreSQL → dbt (bronze / silver / gold) → star schema, double-entry bookkeeping,
 > monthly trial balances, financial statements and loan-portfolio KPIs (PAR 30), orchestrated by
-> Airflow and shown in a Power BI dashboard. Work in progress.
+> Airflow and shown in a Power BI dashboard. The same dbt project also runs on BigQuery, with an
+> automated engine-to-engine comparison (0 difference).
 
-> 🚧 **Projet en construction** — phase 9 en cours : CI GitHub Actions en place, entrepôt cloud
-> (BigQuery) à venir.
+Les neuf phases du plan sont terminées : données générées, ingestion, dbt sur PostgreSQL et
+BigQuery, orchestration Airflow, dashboard Power BI, intégration continue. Documentation dbt
+(lignage, modèles, tests) : **[ndeyependasarr.github.io/imf-data-pipeline](https://ndeyependasarr.github.io/imf-data-pipeline/)**.
 
 ## Objectif
 
@@ -34,35 +38,67 @@ remboursements, charges) en :
 | 6 | Balances, états financiers, KPI, rapprochements | ✅ |
 | 7 | Orchestration Airflow | ✅ |
 | 8 | Dashboard Power BI | ✅ |
-| 9 | CI, documentation, entrepôt cloud | 🚧 |
+| 9 | CI, documentation, entrepôt cloud (BigQuery) | ✅ |
 
-Phase 9 en cours :
+Chiffres de la phase 9, sur des runs réels :
 
-- **CI GitHub Actions** (`.github/workflows/ci.yml`, à chaque push et pull request vers `main`) :
-  PostgreSQL 17 éphémère, ruff, mypy, données générées, ingestion de l'exercice, `dbt build`
-  (450 PASS) et pytest (208 tests, hors tests Airflow lancés dans leur conteneur), en **104 s**.
-- **Correctif K11 du contrôle de volume** : pas de contrôle quand la référence est inférieure à
-  20 opérations (dimanches à petit effectif). Rejoué sur 2025 : **323 jours contrôlés,
-  0 avertissement**, ratios de **71 % à 148 %** (avant : 331 jours, ratios jusqu'à 198 %).
+| Contrôle | Résultat |
+|---|---|
+| CI PostgreSQL (chaque push et pull request vers `main`) | [run 45395881197](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45395881197) : **75 s**, `dbt build` 457 PASS, 227 tests pytest |
+| Job BigQuery (manuel, fédération d'identité) | [run 45396166776](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45396166776) : **351 s**, 457 PASS sur BigQuery, comparaison **71 mesures, 0 écart** |
+| `make rebuild-bq` sur le poste | ≈ 4 min 30 : chargement du bronze, `dbt build --target bq`, comparaison, 0 écart |
+| Tests | 457 nœuds dbt (388 tests de données, 10 unitaires, 7 tests de macros, 6 seeds, 46 modèles) ; 227 tests pytest |
+| Contrôle de volume (correctif K11) | pas de contrôle sous 20 opérations de référence ; rejoué sur 2025 : 323 jours contrôlés, 0 avertissement, ratios de 71 % à 148 % |
 
-## Architecture (cible)
+## Architecture
 
+```mermaid
+flowchart LR
+    gen["Générateur Python<br/>données fictives"] --> csv["CSV d'agences<br/>data/"]
+    gen --> ops[("PostgreSQL<br/>imf_ops")]
+
+    subgraph pg["PostgreSQL : imf_dwh"]
+        bronze[("bronze")] --> silver[("silver")] --> gold[("gold<br/>étoile, écritures, marts")]
+        audit[("audit.audit_runs")]
+    end
+
+    csv --> ing["Ingestion Python<br/>incrémentale, idempotente"]
+    ops --> ing
+    ing --> bronze
+    gold --> pbi["Power BI<br/>3 pages"]
+    audit --> pbi
+
+    subgraph af["Airflow 3 (Docker)"]
+        dag["DAG imf_quotidien<br/>@daily, contrôles"]
+    end
+    dag -. "ingère, dbt build" .-> bronze
+    dag -. "écrit" .-> audit
+
+    subgraph bq["BigQuery (bac à sable, EU)"]
+        bbronze[("bronze + audit")] -- "dbt build --target bq" --> bsilver[("silver")] --> bgold[("gold")]
+    end
+    bronze -- "make load-bq<br/>Parquet, load jobs" --> bbronze
+    audit -- "make load-bq" --> bbronze
+    cmp{{"compare-moteurs<br/>71 mesures"}}
+    gold --> cmp
+    bgold --> cmp
+
+    subgraph ci["GitHub Actions"]
+        cipg["ci.yml : chaque push<br/>PostgreSQL éphémère, tests, docs dbt"]
+        cibq["bigquery.yml : manuel<br/>fédération d'identité, sans clé"]
+    end
+    cibq -. "make rebuild-bq SANS_AUDIT=1" .-> bbronze
 ```
-Générateur Python ──► CSV d'agences + base opérationnelle (imf_ops)
-                              │
-                              ▼
-               Ingestion ──► BRONZE ─► SILVER ─► GOLD   (entrepôt imf_dwh, dbt)
-                                                   │
-                                                   ▼
-                                     Power BI : portefeuille, états financiers, qualité
-```
+
+Le même projet dbt tourne sur deux cibles : `dev` (PostgreSQL, référence) et `bq` (BigQuery).
+`dbt build --target bq` reconstruit silver et gold dans BigQuery à partir du bronze chargé ; la
+comparaison vérifie ensuite que les deux moteurs donnent les mêmes chiffres.
 
 ## Stack
 
 | | Outils |
 |---|---|
-| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt_utils) · Apache Airflow 3.3 · Power BI Desktop |
-| **Prévu** | GitHub Actions |
+| **En place** | Python 3.12 (uv, ruff, mypy, pytest) · PostgreSQL 17 · Docker Compose · dbt Core 1.12 (dbt-postgres, dbt-bigquery, dbt_utils) · Apache Airflow 3.3 · Power BI Desktop · Google BigQuery (bac à sable) · GitHub Actions · GitHub Pages |
 
 ## Lancer le projet
 
@@ -622,18 +658,93 @@ Les autres captures au 15/03 sont dans [`dashboard/captures/`](dashboard/capture
 31/12 par un `dbt build` sans variable : gold identique à
 `docs/phase8/empreinte_gold_reference_31_12.txt` (19 tables).
 
+## BigQuery et intégration continue (phase 9)
+
+### Intégration continue
+
+| Workflow | Déclencheur | Contenu |
+|---|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | chaque push et pull request vers `main` | PostgreSQL 17 éphémère, ruff, mypy, `make generate`, `make ingest-all`, `make dbt-build` (457 PASS), pytest (227 tests ; les 14 tests Airflow tournent dans leur conteneur, `make test-airflow`) ; sur `main`, publication de la documentation dbt sur GitHub Pages |
+| [`bigquery.yml`](.github/workflows/bigquery.yml) | manuel (`workflow_dispatch`), un seul run à la fois | même reconstruction PostgreSQL, puis `make rebuild-bq SANS_AUDIT=1` ; tableau de comparaison sur la page du run |
+
+BigQuery n'est jamais sollicité à chaque push : le job est lancé à la main
+(`gh workflow run bigquery.yml --ref main`).
+
+### Le même projet dbt sur BigQuery
+
+L'entrepôt est reconstruit dans un **bac à sable BigQuery**, sans compte de facturation, région
+`EU` (datasets `bronze`, `audit`, `silver`, `gold`). Projet et région viennent de l'environnement
+(`BQ_PROJECT`, `BQ_LOCATION`) : aucun identifiant n'est écrit dans le dépôt.
+
+```bash
+make rebuild-bq        # load-bq, dbt build --target bq, compare-moteurs (≈ 4 min 30)
+```
+
+- **Pas de Cloud Storage (écart au plan initial).** Sans compte de facturation, Cloud Storage
+  n'est pas disponible. Le bronze est donc chargé directement depuis PostgreSQL : un fichier
+  Parquet par table, chargé par un *load job* BigQuery (`WRITE_TRUNCATE`, aucune requête de
+  modification, ce que le bac à sable n'autorise pas), avec un schéma explicite tiré d'une seule
+  table de correspondance des types ; le nombre de lignes est vérifié après chaque chargement
+  (`ingestion/charger_bq.py`).
+- **Comparaison des moteurs.** `make compare-moteurs` (`scripts/comparer_moteurs.py`) compare
+  PostgreSQL et BigQuery à la même date d'arrêté : encours, PAR 30 (numérateur et dénominateur),
+  bilan et équilibre de chaque mois, résultat, rapprochements, lignes des 19 tables gold, lignes
+  et sommes des montants des 15 tables silver. 71 mesures, **0 écart** ; le moindre écart fait
+  échouer la commande et le job.
+- **Authentification sans clé.** En local : identifiants par défaut de Google
+  (`gcloud auth application-default login`). En CI : fédération d'identité (*Workload Identity
+  Federation*) ; GitHub émet un jeton OIDC, échangé contre l'identité d'un compte de service.
+  Aucune clé JSON, aucun secret : le fournisseur d'identité n'accepte que **ce dépôt** et la
+  branche **`main`**.
+- **L'audit n'est pas rechargé par la CI** (`SANS_AUDIT=1`). Le PostgreSQL éphémère de la CI n'a
+  pas de journal Airflow : le chargeur y exclut `audit.audit_runs` et ne touche pas au dataset
+  `audit`. Après un run CI, BigQuery contient : le bronze du dernier chargement (CI ou poste : mêmes
+  données métier, seules les colonnes techniques d'ingestion diffèrent), silver et gold reconstruits,
+  et l'audit chargé depuis le poste (3 201 lignes). Sans l'option, une table absente reste une
+  erreur.
+- **Expiration à 60 jours.** Dans le bac à sable, tables et vues expirent au bout de 60 jours :
+  `make rebuild-bq` recrée tout l'entrepôt en une commande.
+- **Quota, au pire cas.** L'entrepôt occupe ≈ 119 Mio logiques (bronze 26,5 ; silver 30,7 ;
+  gold 61,0 ; audit 0,75). En supposant que le stockage des tables supprimées ne soit jamais
+  rendu sur la limite de 10 Gio, cela laisse ≈ 85 reconstructions, soit ≈ 14 ans à une
+  reconstruction tous les 60 jours. Garde-fou : une requête qui lirait plus de 1 Go échoue
+  (`maximum_bytes_billed`).
+
+### Portage PostgreSQL → BigQuery
+
+Ordre de préférence : SQL standard commun aux deux moteurs, puis macros dbt (`dbt.date_trunc`,
+`dbt.last_day`, `dbt.datediff`, `dbt.type_string`…), puis 8 macros maison `adapter.dispatch`
+(`dbt/macros/`), chacune avec une version PostgreSQL, une version BigQuery et une version par
+défaut qui échoue. Chaque macro maison est testée sur des valeurs littérales, sur les deux
+moteurs (`dbt/tests/macros/`, par exemple : jour ISO du dimanche 16/02/2025 = 7, âge d'une
+personne née un 29/02). Contrats dbt en types génériques (`string`, `integer`…) valables sur les
+deux moteurs ; les taux restent `numeric(6,4)` sur PostgreSQL et passent en `NUMERIC` sur
+BigQuery, qui refuse les types paramétrés dans un `CAST`. Côté PostgreSQL, un `analyze` après
+chaque table construite garde des plans d'exécution corrects (`fct_ecritures` : plus de 9 min sans
+statistiques, 2 s avec). Inventaire complet, cas par cas :
+[`docs/phase9/inventaire_bq.md`](docs/phase9/inventaire_bq.md).
+
+### Documentation dbt
+
+Publiée sur GitHub Pages à chaque push sur `main` :
+**[ndeyependasarr.github.io/imf-data-pipeline](https://ndeyependasarr.github.io/imf-data-pipeline/)**
+(modèles, colonnes, tests et graphe de lignage, générés sur la base PostgreSQL de la CI).
+
 ## Structure actuelle
 
 ```
+├── .github/workflows/      # ci.yml (PostgreSQL, tests, docs dbt) et bigquery.yml (manuel, sans clé)
 ├── airflow/                # image Airflow, DAG imf_quotidien, reprise et tests d'intégrité
 ├── orchestration/          # commandes du DAG (contrôles, dbt, audit), sans Airflow, et leurs tests
 ├── dashboard/              # Power BI : .pbix, captures, mesures DAX, modèle de données, thème, rôle de lecture
 ├── docker/postgres/init/   # création des bases et des schémas
 ├── dbt/                    # projet dbt : sources bronze, modèles et tests silver, seeds du cadrage
 ├── generator/              # générateur de données (vérité, anomalies, imf_ops) et ses tests
-├── ingestion/              # ingestion bronze (fenêtres, extraction, chargement, journal) et ses tests
+├── ingestion/              # ingestion bronze et chargeur BigQuery (charger_bq.py), et leurs tests
+├── scripts/                # comparer_moteurs.py : comparaison PostgreSQL / BigQuery
+├── docs/                   # cadrage public (PRD, phases), références d'empreinte, inventaire BigQuery
 ├── data/                   # sorties du générateur (non versionnées)
-├── tests/                  # tests du socle et test silver = vérité
+├── tests/                  # tests du socle, vérité silver et gold, comparaison des moteurs
 ├── docker-compose.yml
 ├── Makefile
 └── pyproject.toml
@@ -644,7 +755,7 @@ Les autres captures au 15/03 sont dans [`dashboard/captures/`](dashboard/capture
 - Données **100 % fictives**.
 - Plan de comptes **simplifié**, à codes internes : ce n'est pas le référentiel comptable officiel
   des SFD (RCSFD) ; les correspondances avec le SYSCOHADA sont **indicatives**.
-- La liste complète sera publiée avec les états financiers (phase 6).
+- Liste complète des limites : [PRD, §12](docs/cadrage/PRD_pipeline_IMF_SYSCOHADA.md#12-limites-à-afficher-dans-le-readme).
 - Approvisionnements des caisses en une seule pièce (journal VIR), sans compte de fonds en transit.
 - Banque contrôlée au niveau de l'IMF (un seul compte bancaire), pas par agence.
 - TEG calculé sur l'échéancier théorique, pas sur les paiements réels.
@@ -663,6 +774,11 @@ Les autres captures au 15/03 sont dans [`dashboard/captures/`](dashboard/capture
   à payer).
 - Remboursements partiels : imputation pénalités → intérêts → capital par échéance ; 243 soldes
   d'échéance sans intérêts.
+- BigQuery dans un bac à sable : pas de Cloud Storage (zone brute chargée depuis PostgreSQL),
+  données supprimées au bout de 60 jours (`make rebuild-bq`), pas de requêtes de modification.
+- L'audit BigQuery est la copie chargée depuis le poste : la CI ne le recharge pas.
+- Airflow n'orchestre que la cible PostgreSQL ; BigQuery est reconstruit à la demande
+  (`make rebuild-bq` ou job manuel).
 
 ## Licence
 

@@ -9,7 +9,7 @@ ENV_FILE := $(if $(wildcard .env),--env-file .env,)
 
 .PHONY: help install up down logs reset-db psql-dwh psql-ops generate generate-small \
 	ingest ingest-range ingest-all load-bq reset-bronze \
-	dbt-deps dbt-build test-verite compare-moteurs rebuild-bq airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes powerbi-role test-airflow \
+	dbt-deps dbt-build dbt-docs test-verite compare-moteurs rebuild-bq airflow-up airflow-down airflow-logs airflow-reprendre empreinte-gold compare-empreintes powerbi-role test-airflow \
 	lint format typecheck test test-all check
 
 help: ## Affiche cette aide
@@ -75,6 +75,9 @@ dbt-deps: ## Installe les packages dbt (dbt_utils)
 dbt-build: ## Seeds + modèles silver + tests dbt (prérequis : make ingest-all)
 	@test -d dbt/dbt_packages/dbt_utils || $(MAKE) dbt-deps
 	$(DBT) build $(DBT_OPTIONS)
+
+dbt-docs: ## Documentation dbt en une page (dbt/target/static_index.html ; prérequis : dbt-build)
+	$(DBT) docs generate $(DBT_OPTIONS) --static
 
 test-verite: ## Compare chaque slv_* à data/_verite/ (prérequis : make ingest-all dbt-build)
 	uv run pytest tests/test_silver_verite.py

@@ -9,6 +9,7 @@
 > **Version 1.5 du 21/11/2026** (phases 2 et 3 terminées) : `charges` et `appro_caisse` découpés par jour (§6.1, I11) ; `date_maj` des crédits = date de décaissement (I10, remplace la règle des crédits soldés de `P1_phase2_cadrage.md` 9.1) ; décaissements selon une courbe mensuelle, aucun en janvier (§5, I14) ; zone de landing des extractions `imf_ops` et modules d'ingestion (§10) ; limites complétées (§12). Décisions de la phase 3 dans `P1_phase3_cadrage.md`.
 > **Version 1.6 du 22/11/2026** (phases 4, 5 et 6 terminées) : écarts reportés depuis `P1_phase4_cadrage.md` (S1–S17), `P1_phase5_cadrage.md` (G1–G15) et `P1_phase6_cadrage.md` (H1–H12). Grain de `fct_portefeuille_quotidien` en jours calendaires (H1) ; `mart_rapprochements` ajouté, `audit_runs` déplacé en phase 7 (§6.2) ; seeds v0.5 (`journaux.type_evenement`, `plan_comptes.rubrique_solde_inverse`) (§6.3) ; définitions du PAR 30 et du taux de remboursement précisées (§7) ; tests complétés (§8.3) ; sous-dossier `silver/staging/`, `docs/cadrage/` et cas chiffrés (§10) ; phases 4 à 6 terminées (§9) ; limites complétées (§12).
 > **Version 1.7 du 22/11/2026** (phase 7 terminée) : écarts reportés depuis `P1_phase7_cadrage.md` (J1–J20). `catalogue_anomalies.date_ligne` (§6.1, J16) ; gold « à date » : variable `date_arrete`, `date_situation`, `dim_credit.statut_a_l_arrete` ; `audit.audit_runs` (§6.2, J2, J13, J15, J17) ; schéma `audit` et orchestration (§8.1) ; Airflow 3.3.2, image à deux environnements, dépôt monté en lecture seule (§8.2, J6, J7) ; tests ramenés à l'arrêté, contrôles de complétude et de volume (§8.3, J3, J4, J12, J18) ; phase 7 terminée (§9) ; paquet `orchestration/`, `airflow/plugins/` abandonné (§10, J19) ; mois partiel et limite I10 neutralisée (§12, J15, J17).
+> **Version 1.8 du 24/11/2026** (phases 8 et 9 terminées) : écarts reportés depuis `P1_phase9_cadrage.md` (L1–L16). Zone brute **sans Cloud Storage** : bronze et audit chargés dans BigQuery depuis PostgreSQL (§5, §8.1, §8.2, §8.4, L1, L2) ; comparaison des moteurs versionnée (§8.4, L3) ; CI PostgreSQL à chaque push, job BigQuery manuel par fédération d'identité, docs dbt sur GitHub Pages (§8.2, §8.4, L4, L14, L16) ; phases 8 et 9 terminées (§9) ; chargeur, `scripts/`, workflows, schéma Mermaid (§10) ; critères de réussite atteints (§11) ; limites L1, L13, L15 (§12).
 
 ---
 
@@ -77,7 +78,7 @@ Construire un **pipeline de données ELT de bout en bout**, orchestré et testé
 - Write-audit-publish (publication du gold seulement après tests verts) ; astronomer-cosmos (bonus, J1).
 - Streaming temps réel.
 - Spark : volume trop faible pour le justifier ici.
-- Déploiement cloud **complet** (Airflow ou PostgreSQL managés). En revanche, l'entrepôt BigQuery et la zone brute Cloud Storage **font partie du plan** (phase 9, section 8.4).
+- Déploiement cloud **complet** (Airflow ou PostgreSQL managés). En revanche, l'entrepôt BigQuery **fait partie du plan** (phase 9, section 8.4) ; la zone brute Cloud Storage a été écartée en phase 9 (L1 : pas de compte de facturation).
 - Machine learning (scoring de crédit).
 - Conformité réglementaire réelle (reporting BCEAO).
 
@@ -204,10 +205,11 @@ Les marts stockent les numérateurs et les dénominateurs, jamais les ratios : P
 [Power BI] Dashboards : pilotage portefeuille + états financiers + qualité
 
 Orchestration : Airflow 3 (DAG imf_quotidien, @daily) → audit.audit_runs
-Conteneurs : Docker Compose · CI : GitHub Actions (phase 9)
+Conteneurs : Docker Compose · CI : GitHub Actions (PostgreSQL à chaque push, BigQuery manuel)
 
-Phase 9 (cloud) : fichiers bronze copiés dans Google Cloud Storage ;
-même projet dbt exécuté aussi sur BigQuery (cible `bq`).
+Phase 9 (cloud) : tables bronze et audit chargées dans BigQuery depuis PostgreSQL (Parquet,
+load jobs, sans Cloud Storage) ; même projet dbt exécuté aussi sur BigQuery (cible `bq`) ;
+comparaison des deux moteurs (scripts/comparer_moteurs.py).
 ```
 
 PostgreSQL (MVP) : **une instance, deux bases**. `imf_ops` joue la base opérationnelle (source) ; `imf_dwh` est l'entrepôt, avec les schémas `bronze`, `silver`, `gold` et **`audit`** (journal d'exécution, phase 7) (schémas exacts via `generate_schema_name`, seeds dans `silver`, S2). Les deux bases et les schémas `bronze`, `silver`, `gold` sont créés au premier démarrage par `docker/postgres/init/` ; le schéma `audit` et `audit.audit_runs` sont créés par `orchestration/sql/audit.sql`, à la première écriture d'audit. Les tables de `imf_ops` sont créées et rechargées par le générateur (`generator/sql/imf_ops.sql`). Les tables bronze sont créées par l'ingestion (`ingestion/sql/bronze.sql`) ; les extractions de `imf_ops` passent par une zone de landing (`data/landing/imf_ops/`) avant le chargement (I8). Les métadonnées d'Airflow ont leur propre base (`airflow-db`), séparée de l'entrepôt (J6).
@@ -235,8 +237,9 @@ Les tâches sont des `@task` Python qui lancent le CLI `python -m orchestration 
 | pytest | Tests Python (générateur, ingestion, socle, orchestration, comparaison à la vérité) | Fiabilité du code |
 | GitHub Actions | CI : lint (ruff), types (mypy), tests, `dbt build` | Pratiques professionnelles |
 | Power BI | Dashboard | Outil BI de référence, modèle sémantique et mesures DAX |
-| Google Cloud Storage + BigQuery | Zone brute et entrepôt cloud (phase 9) | Un cloud gratuit et durable (bac à sable BigQuery, sans carte bancaire) |
-| *(Bonus)* Terraform | Création du bucket et des datasets | Infrastructure recréable à l'identique |
+| BigQuery (bac à sable) + dbt-bigquery | Entrepôt cloud (phase 9), même projet dbt, cible `bq` | Un cloud gratuit et durable, sans compte de facturation. Cloud Storage écarté (L1) : sans facturation, pas de bucket ; le bronze est chargé depuis PostgreSQL (google-cloud-bigquery, pyarrow, groupe uv `bq`) |
+| GitHub Actions + GitHub Pages | CI PostgreSQL à chaque push, job BigQuery manuel (fédération d'identité, sans clé), docs dbt publiées | Preuve rejouable à chaque push ; aucun secret stocké |
+| *(Bonus)* Terraform | Création des datasets | Infrastructure recréable à l'identique |
 
 Poste de développement : Windows 11 + **WSL2** (Ubuntu) + Docker Desktop (intégration WSL activée). Le dépôt est cloné dans le système de fichiers Linux (`~/…`), pas dans `/mnt/c`.
 
@@ -271,10 +274,13 @@ La liste numérotée (T1 à T17) est dans `P1_phase0_cadrage.md` §3.
 
 - **Deux cibles dbt, un seul projet** : `dbt build --target dev` (PostgreSQL local) et `dbt build --target bq` (BigQuery) doivent passer tous les deux.
 - Les différences de SQL entre PostgreSQL et BigQuery sont isolées dans des **macros** (`dbt/macros/`), jamais copiées dans les modèles.
-- **Zone brute cloud** : les fichiers bronze (CSV sources et extractions de landing) sont copiés dans un bucket Google Cloud Storage (`ingestion/upload_gcs.py`).
-- **Contrainte du bac à sable** : tables, vues et partitions expirent au bout de **60 jours**. Une commande `make rebuild-bq` recrée tout l'entrepôt.
+- **Zone brute sans Cloud Storage (L1, écart à la v1.7)** : le bac à sable n'a pas de compte de facturation, donc pas de bucket. Les 14 tables bronze et `audit.audit_runs` sont lues dans PostgreSQL, écrites en Parquet et chargées par des *load jobs* (`WRITE_TRUNCATE`, aucune requête de modification) dans les datasets `bronze` et `audit`, schéma explicite tiré d'une seule table de correspondance des types, nombre de lignes contrôlé (`ingestion/charger_bq.py`, `make load-bq`, L2). `ingestion/upload_gcs.py` est abandonné.
+- **Région** : tous les datasets en `EU` (`BQ_LOCATION`) ; projet lu dans `BQ_PROJECT`, jamais écrit dans le dépôt (L5).
+- **Comparaison des moteurs (L3)** : `scripts/comparer_moteurs.py`, `make compare-moteurs` : gold (encours, PAR 30, bilan et équilibre mensuel, résultat, rapprochements, lignes des 19 tables) et silver (lignes, sommes des montants) ; échec au moindre écart ; tableau dans le résumé du run en CI.
+- **CI (L4, L14, L15)** : BigQuery jamais à chaque push ; job manuel `bigquery.yml`, authentifié par fédération d'identité (fournisseur restreint au dépôt et à `main`), sans clé JSON ; garde-fou `maximum_bytes_billed` 1 Go ; la CI ne recharge pas l'audit (`SANS_AUDIT=1`).
+- **Contrainte du bac à sable** : pas de DML ni de streaming ; tables, vues et partitions expirent au bout de **60 jours**. `make rebuild-bq` recrée tout l'entrepôt (chargement, `dbt build --target bq`, comparaison). Quota au pire cas : ≈ 119 Mio par reconstruction, ≈ 85 reconstructions dans 10 Gio.
 - **Snowflake écarté** : l'essai gratuit dure 30 jours, la démo disparaîtrait.
-- **Bonus** : Terraform pour le bucket et les datasets ; Power BI connecté à BigQuery.
+- **Bonus** : Terraform pour les datasets ; Power BI connecté à BigQuery.
 - Aucun identifiant ni clé de service dans le dépôt : variables d'environnement et `.env` dans `.gitignore`.
 
 ## 9. Comment s'y prendre (phases)
@@ -292,13 +298,12 @@ La liste numérotée (T1 à T17) est dans `P1_phase0_cadrage.md` §3.
 | **6 – Marts** | Balances mensuelles, compte de résultat, bilan simplifié, KPI, rapprochements. Détail : `P1_phase6_cadrage.md` | ✅ **Terminée** le 22/11/2026 : bilan équilibré chaque mois, rapprochements à 0, résultat et PAR 30 = vérité, cas chiffrés verts. |
 | **7 – Orchestration** | DAG Airflow quotidien, retries, contrôles bloquants (y compris modèles sautés par dbt après un test en échec), `audit_runs`, gold « à date ». Détail : `P1_phase7_cadrage.md` | ✅ **Terminée** le 22/11/2026 : backfill de l'exercice 2025 = **365 runs en SUCCES, chaque étape à la tentative 1** (2 555 lignes d'audit), 3 h 27 ; gold au 31/12 identique à la référence (MD5, 19 tables) ; gold au 15/03 identique sur bronze partiel et complet ; 3 pannes démontrées (fichier tronqué, seed cassé, PostgreSQL arrêté) |
 | **8 – Restitution** | Dashboard Power BI (pilotage portefeuille + états financiers + qualité / fraîcheur depuis `audit.audit_runs`, mention « données arrêtées au »). Détail : `P1_phase8_cadrage.md` | ✅ **Terminée** le 24/11/2026 : 3 pages (pilotage, états financiers, qualité / fraîcheur), `.pbix` ; au 31/12 bilan 2 119 584 054, résultat −333 130 376, PAR 30 4,9992 %, encours 1 850 520 623, rapprochements 0, 365 runs réussis ; test « à date » au 15/03 sans Airflow (`audit_runs` inchangé, 3 201 lignes) : bandeau 15/03, alerte rouge, encours 163 386 715, bilan 1 876 010 446 équilibré ; retour au 31/12 : empreinte identique à la référence de la phase 8 ; libellés des rubriques (K14) ; livraison : captures, `mesures.md`, README, cadrage public |
-| **9 – Industrialisation et cloud** | CI GitHub Actions, README complet, schéma d'architecture, docs dbt ; **cible dbt BigQuery + zone brute Cloud Storage** (section 8.4) | Repo présentable à un recruteur ; `dbt build` vert sur PostgreSQL **et** sur BigQuery |
+| **9 – Industrialisation et cloud** | CI GitHub Actions, README complet, schéma d'architecture, docs dbt ; **cible dbt BigQuery**, bronze chargé depuis PostgreSQL (section 8.4, sans Cloud Storage). Détail : `P1_phase9_cadrage.md` | ✅ **Terminée** le 24/11/2026 : CI PostgreSQL à chaque push (75 s, 457 PASS, 227 pytest) ; job BigQuery manuel par fédération d'identité, sans clé (351 s, 457 PASS sur BigQuery) ; comparaison des moteurs versionnée : **71 mesures, 0 écart** (encours 1 850 520 623, PAR 30 4,9992 %, bilan 2 119 584 054, résultat −333 130 376) ; `make rebuild-bq` ≈ 4 min 30 ; docs dbt sur GitHub Pages ; contrôle de volume corrigé (K11 : 323 jours contrôlés, 0 avertissement) |
 | **Bonus** | Provisions, SCD 2 sur `dim_client`, write-audit-publish, Cosmos, Terraform, Power BI sur BigQuery | — |
 
 > **Publication au fil de l'eau** : le dépôt est public dès la phase 1 et le README suit l'avancement. Un recruteur doit voir un projet vivant. Pas de rafales de commits ni de push forcé.
 
-**Reste ouvert après la phase 7** (petit correctif, sans bloquer la phase 8) :
-- contrôle de volume trop sensible les **dimanches à petit effectif** (198 % le 16/02 : 16 opérations pour une référence de 8) ; option : pas de contrôle si la référence est < 20 ;
+**Corrigé en phase 9** (K11, L8) : le contrôle de volume était trop sensible les dimanches à petit effectif (198 % le 16/02 : 16 opérations pour une référence de 8) ; il n'y a plus de contrôle quand la référence est inférieure à 20 opérations.
 
 ## 10. Structure du repo
 
@@ -346,7 +351,7 @@ imf-data-pipeline/
 │   ├── chargement.py          # fichier → bronze (COPY)
 │   ├── journal.py             # bronze._ingestions, bronze._filigranes
 │   ├── sql/bronze.sql         # DDL idempotent du bronze
-│   ├── upload_gcs.py          # phase 9
+│   ├── charger_bq.py          # phase 9 (L1, L2, L15) : bronze et audit → BigQuery (Parquet, load jobs)
 │   └── tests/
 ├── orchestration/             # phase 7 (J19) : logique des tâches, sans import Airflow, testée par le pytest du projet
 │   ├── __init__.py            # contrat des codes de sortie
@@ -383,25 +388,30 @@ imf-data-pipeline/
 │   │                          # (pas de plugins/ : le code d'orchestration n'est pas un plugin Airflow, J19)
 │   ├── reprendre.py           # reprise d'un jour en échec (make airflow-reprendre)
 │   └── tests/                 # DagBag et reprise, lancés dans le conteneur (make test-airflow)
-├── .github/workflows/ci.yml   # phase 9
+├── scripts/                   # phase 9 : comparer_moteurs.py (L3, make compare-moteurs)
+├── .github/workflows/         # phase 9 : ci.yml (PostgreSQL à chaque push, tests, docs dbt sur
+│                              # GitHub Pages) ; bigquery.yml (manuel, fédération d'identité, L4, L14)
 ├── infra/terraform/           # bonus
 ├── dashboard/                 # .pbix + captures (phase 8)
 └── docs/
-    ├── cadrage/               # versions publiques des cadrages, PRD, cas chiffrés (phases 6–7)
-    └── img/                   # architecture, choix techniques (phase 9)
+    ├── cadrage/               # versions publiques des cadrages, PRD, cas chiffrés (phases 6–9)
+    ├── phase7/, phase8/       # empreintes de référence du gold
+    └── phase9/                # inventaire de compatibilité BigQuery
 ```
+
+Schéma d'architecture : Mermaid dans le README (L16), à la place de `docs/img/`.
 
 ## 11. Critères de réussite
 
 - [x] Le pipeline complet se lance avec Docker et s'exécute automatiquement via Airflow — phase 7.
 - [x] Une relance ne crée ni doublon ni incohérence (idempotence) — phase 3 ; rejeux idempotents vérifiés par le contrôle de complétude — phase 7.
-- [ ] Tous les tests dbt et pytest passent en CI. *(verts en local : 391 tests dbt dont 10 unitaires, 203 pytest ; CI en phase 9)*
+- [x] Tous les tests dbt et pytest passent en CI — phase 9 (457 nœuds dbt, 227 pytest à chaque push).
 - [x] Les défauts injectés sont détectés par les tests — phase 4.
 - [x] La balance est équilibrée (débit = crédit) et aucun événement n'est rejeté — phases 5–6.
 - [x] Les rapprochements gestion ↔ comptabilité sont à zéro — phase 6.
 - [x] Les KPI et états financiers sont vérifiés à la main sur un échantillon — phase 6.
-- [ ] Le pipeline produit **la même balance, au franc près**, sur PostgreSQL et sur BigQuery.
-- [ ] Le README permet à un inconnu de comprendre et relancer le projet.
+- [x] Le pipeline produit **la même balance, au franc près**, sur PostgreSQL et sur BigQuery — phase 9 (comparaison des moteurs : 71 mesures, 0 écart, en local et en CI).
+- [x] Le README permet à un inconnu de comprendre et relancer le projet — phase 9 (commandes, schéma d'architecture, docs dbt en ligne).
 
 ## 12. Limites (à afficher dans le README)
 
@@ -426,6 +436,9 @@ imf-data-pipeline/
 - Runs `imf_ops` **cumulatifs** (filigrane) : rejouer un jour passé ne recharge rien ; pour tout rejouer, `make reset-bronze`.
 - Si un test dbt échoue, le run Airflow échoue (sans retry) et le jour suivant est bloqué (`depends_on_past`), mais les modèles déjà construits restent en base et les modèles sautés gardent leur **ancienne version** : pas de write-audit-publish (bonus). Le dashboard affiche la date d'arrêté du dernier run réussi.
 - Contrôle de volume : détecte une **rupture brutale** (jour divisé par 3 → 34 %), **pas une dérive lente** ; sensible aux jours à petit effectif (dimanches).
-- Orchestration **locale** (Airflow dans Docker, LocalExecutor) ; seuls l'entrepôt (BigQuery, bac à sable) et la zone brute (Cloud Storage) sont dans le cloud.
+- Orchestration **locale** (Airflow dans Docker, LocalExecutor) ; seul l'entrepôt (BigQuery, bac à sable) est dans le cloud. Airflow n'orchestre que la cible PostgreSQL ; BigQuery est reconstruit à la demande (`make rebuild-bq` ou job CI manuel).
+- **Pas de Cloud Storage** (L1) : sans compte de facturation, pas de zone brute dans le cloud ; le bronze BigQuery est chargé depuis PostgreSQL.
 - Pipeline **batch** uniquement.
-- Bac à sable BigQuery : données supprimées au bout de 60 jours, recréées par `make rebuild-bq`.
+- Bac à sable BigQuery : données supprimées au bout de 60 jours, recréées par `make rebuild-bq` ; pas de requêtes de modification ni de streaming.
+- **Statistiques PostgreSQL** (L13) : un `analyze` après chaque seed et chaque table construite est nécessaire (sans lui, `fct_ecritures` passe de 2 s à plus de 9 min) ; vérifié dans le conteneur Airflow, sans run du DAG (l'audit reste à 3 201 lignes).
+- **L'audit BigQuery est une copie du poste** (L15) : la CI ne recharge pas `audit.audit_runs` ; après un run CI, le bronze BigQuery est celui de la CI (mêmes données métier, colonnes techniques d'ingestion différentes).

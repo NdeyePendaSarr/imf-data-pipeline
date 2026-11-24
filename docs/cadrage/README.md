@@ -13,6 +13,7 @@ Documents de référence du pipeline SenFinance Microcrédit, dans l'ordre de le
 - [P1_phase6_cadrage.md](P1_phase6_cadrage.md) — Phase 6 : marts, balances, états financiers, KPI, rapprochements (H1 à H12).
 - [P1_phase7_cadrage.md](P1_phase7_cadrage.md) — Phase 7 : orchestration Airflow, gold « à date », contrôles et audit (J1 à J20).
 - [P1_phase8_cadrage.md](P1_phase8_cadrage.md) — Phase 8 : dashboard Power BI, deux dates, mesures semi-additives, lecture de l'audit (K1 à K14).
+- [P1_phase9_cadrage.md](P1_phase9_cadrage.md) — Phase 9 : CI, BigQuery sans Cloud Storage, comparaison des moteurs, fédération d'identité, docs dbt (L1 à L16).
 - [P1_checklist_relecture_SFD.md](P1_checklist_relecture_SFD.md) — Points à faire vérifier par un professionnel des SFD sur le plan de comptes et le mapping.
 - [P1_cas_chiffres_tests.md](P1_cas_chiffres_tests.md) — Cas chiffrés calculés à la main (écritures, balances, compte de résultat, rapprochements, bilan) : attendus des tests unitaires des marts.
 - [P1_phase6_notes.md](P1_phase6_notes.md) — Phase 6 : notes de relecture (ordre d'imputation des remboursements, lot A).

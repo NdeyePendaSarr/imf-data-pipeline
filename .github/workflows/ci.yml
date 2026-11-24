@@ -100,3 +100,35 @@ jobs:
       # Les tests marqués airflow (DagBag, reprise) ne tournent que dans le conteneur Airflow.
       - name: Tests (pytest)
         run: uv run pytest -m "not airflow"
+
+      # Documentation dbt (L16) : sur push vers main seulement, générée sur la base de la CI
+      # (cible dev), en une page autonome ; publiée par le job pages ci-dessous.
+      - name: Documentation dbt (make dbt-docs)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          make dbt-docs
+          mkdir -p site
+          cp dbt/target/static_index.html site/index.html
+
+      - name: Artefact GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  pages:
+    # Seul job autorisé à publier : droits Pages et jeton OIDC limités à lui.
+    needs: pipeline
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - name: Publication sur GitHub Pages
+        id: deploiement
+        uses: actions/deploy-pages@v4
