@@ -31,7 +31,7 @@ Exercice 2025, données générées (2 000 clients, 3 000 crédits), arrêté au
 | Écritures comptables | 84 572 pièces, 181 193 lignes, chaque pièce équilibrée, aucun événement rejeté |
 | Orchestration (Airflow) | exercice rejoué jour par jour : **365 runs réussis**, 0 échec, 3 h 27 |
 | PostgreSQL ↔ BigQuery | même projet dbt sur les deux moteurs : **71 mesures comparées, 0 écart** |
-| Tests | 457 nœuds dbt verts sur chaque moteur (dont 388 tests de données) ; 227 tests pytest |
+| Tests | 457 nœuds dbt verts sur chaque moteur (dont 395 tests de données) ; 227 tests pytest |
 | CI à chaque push | [job principal **109 s** + **26 s** de publication des docs dbt](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45399031578) |
 | Job BigQuery (manuel) | [**351 s**, sans clé de service](https://github.com/NdeyePendaSarr/imf-data-pipeline/actions/runs/45396166776) |
 
